@@ -1462,4 +1462,13 @@ config I2C_STATUS_FOR_TOUCH
 		Say Y here if you use touch driver detect system i2c status when exit suspend state.
 		If unsure, say N.
 
+config TOUCHSCREEN_COMMON
+	bool "Common touchscreen interface to interact with userspace"
+	default y
+	help
+	  Say Y here if you want to control touchpanel features via
+	  /sys/touchpanel.
+
+	  If unsure, say N.
+
 endif
