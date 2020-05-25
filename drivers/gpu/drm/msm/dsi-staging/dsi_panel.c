@@ -917,6 +917,13 @@ static int dsi_panel_set_hbm(struct dsi_panel *panel, bool enabled)
 
 static u32 dsi_panel_get_backlight(struct dsi_panel *panel)
 {
+	if (panel->doze_status) {
+		if (panel->hbm_enabled)
+			return panel->bl_config.bl_doze_hbm;
+		else
+			return panel->bl_config.bl_doze_lpm;
+	}
+
 	return panel->bl_config.bl_level;
 }
 
@@ -2559,6 +2566,24 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 		panel->bl_config.brightness_max_level = 255;
 	} else {
 		panel->bl_config.brightness_max_level = val;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,disp-doze-lpm-backlight",
+				  &val);
+	if (rc) {
+		panel->bl_config.bl_doze_lpm = 0;
+		pr_debug("[%s] set doze lpm backlight to 0\n", panel->name);
+	} else {
+		panel->bl_config.bl_doze_lpm = val;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,disp-doze-hbm-backlight",
+				  &val);
+	if (rc) {
+		panel->bl_config.bl_doze_hbm = 0;
+		pr_debug("[%s] set doze hbm backlight to 0\n", panel->name);
+	} else {
+		panel->bl_config.bl_doze_hbm = val;
 	}
 
 	rc = dsi_panel_parse_fod_dim_lut(panel, of_node);
