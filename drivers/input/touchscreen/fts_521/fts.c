@@ -74,6 +74,10 @@
 #include "fts_lib/ftsTime.h"
 #include "fts_lib/ftsTool.h"
 
+#if defined(CONFIG_TOUCHSCREEN_COMMON) && defined(GESTURE_MODE)
+#include <linux/input/tp_common.h>
+#endif
+
 /**
  * Event handler installer helpers
  */
@@ -1133,6 +1137,40 @@ static ssize_t fts_gesture_coordinates_show(struct device *dev,
 			 "%s %s: Unable to allocate all_strbuff! ERROR %08X\n",
 			 tag, ERROR_ALLOC);
 	}
+
+	return count;
+}
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_COMMON) && defined(GESTURE_MODE)
+static ssize_t double_tap_show(struct kobject *kobj,
+                               struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", fts_info->gesture_enabled);
+}
+
+static void fts_switch_mode_work(struct work_struct *work);
+
+static ssize_t double_tap_store(struct kobject *kobj,
+                                struct kobj_attribute *attr, const char *buf,
+                                size_t count)
+{
+	int rc, val;
+	struct fts_mode_switch *ms;
+
+	rc = kstrtoint(buf, 10, &val);
+	if (rc)
+	return -EINVAL;
+
+	ms = (struct fts_mode_switch *)kmalloc(sizeof(struct fts_mode_switch), GFP_ATOMIC);
+	if (ms == NULL)
+	return -EINVAL;
+
+	ms->info = fts_info;
+	ms->mode = (unsigned char)!!val;
+	INIT_WORK(&ms->switch_mode_work,
+			fts_switch_mode_work);
+	schedule_work(&ms->switch_mode_work);
 
 	return count;
 }
@@ -2227,6 +2265,13 @@ static DEVICE_ATTR(gesture_mask, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   fts_gesture_mask_show, fts_gesture_mask_store);
 static DEVICE_ATTR(gesture_coordinates, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   fts_gesture_coordinates_show, NULL);
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_COMMON) && defined(GESTURE_MODE)
+static struct tp_common_ops double_tap_ops = {
+	.show = double_tap_show,
+	.store = double_tap_store,
+};
 #endif
 
 static struct attribute *fts_attr_group[] = {
@@ -4611,6 +4656,9 @@ static int fts_probe(struct spi_device *client)
 	int retval;
 	int skip_5_1 = 0;
 	u16 bus_type;
+#if defined(CONFIG_TOUCHSCREEN_COMMON) && defined(GESTURE_MODE)
+	int ret;
+#endif
 
 	logError(1, "%s %s: driver ver: %s\n", tag, __func__,
 		 FTS_TS_DRV_VERSION);
@@ -4890,6 +4938,14 @@ static int fts_probe(struct spi_device *client)
 		error = -ENODEV;
 		goto ProbeErrorExit_7;
 	}
+
+#if defined(CONFIG_TOUCHSCREEN_COMMON) && defined(GESTURE_MODE)
+	ret = tp_common_set_double_tap_ops(&double_tap_ops);
+	if (ret < 0) {
+		logError(1, "%s ERROR: Failed to create double_tap node err=%d\n",
+		            tag, ret);
+	}
+#endif
 
 	fts_info = info;
 	error = fts_proc_init();
