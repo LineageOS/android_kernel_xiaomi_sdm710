@@ -1313,6 +1313,10 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	INIT_WORK(&dwc->bh_work, dwc3_bh_work);
 
+	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+	if (ret)
+		return ret;
+
 	pm_runtime_no_callbacks(dev);
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
