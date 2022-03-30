@@ -1452,4 +1452,14 @@ config TOUCHSCREEN_RAYDIUM_CHIPSET
 
 	  If unsure, say N.
 
+source "drivers/input/touchscreen/focaltech_touch_mi/Kconfig"
+source "drivers/input/touchscreen/fts_521/Kconfig"
+source "drivers/input/touchscreen/tp_goodix_driver/Kconfig"
+
+config I2C_STATUS_FOR_TOUCH
+	bool "I2C Status for touch"
+	help
+		Say Y here if you use touch driver detect system i2c status when exit suspend state.
+		If unsure, say N.
+
 endif
