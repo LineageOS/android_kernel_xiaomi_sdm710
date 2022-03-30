@@ -18,6 +18,7 @@
 #include "cam_hw_mgr_intf.h"
 #include "cam_req_mgr_interface.h"
 
+#define CAM_NODE_NAME_LENGTH_MAX        256
 
 #define CAM_NODE_STATE_UNINIT           0
 #define CAM_NODE_STATE_INIT             1
@@ -30,6 +31,7 @@
  *                            0 = uninitialized, 1 = initialized
  * @list_mutex:            Mutex for the context pool
  * @free_ctx_list:         Free context pool list
+ * @acquired_ctx_list:     Acquired context pool list
  * @ctx_list:              Context list
  * @ctx_size:              Context list size
  * @hw_mgr_intf:           Interface for cam_node to HW
@@ -37,12 +39,13 @@
  *
  */
 struct cam_node {
-	char                         name[CAM_CTX_DEV_NAME_MAX_LENGTH];
+	char                         name[CAM_NODE_NAME_LENGTH_MAX];
 	uint32_t                     state;
 
 	/* context pool */
 	struct mutex                 list_mutex;
 	struct list_head             free_ctx_list;
+	struct list_head             acquired_ctx_list;
 	struct cam_context          *ctx_list;
 	uint32_t                     ctx_size;
 
