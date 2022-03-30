@@ -1,3 +1,26 @@
+ifeq ($(CONFIG_MACH_XIAOMI),y)
+
+ifeq ($(CONFIG_MACH_XIAOMI_SDM710),y)
+ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
+	dtbo-$(CONFIG_ARCH_SDM670) += \
+		sirius-sdm710-overlay.dtbo \
+		sirius-sdm670-overlay.dtbo \
+		grus-sdm710-overlay.dtbo \
+		grus-sdm712-overlay.dtbo \
+		pyxis-sdm710-overlay.dtbo \
+		vela-sdm710-overlay.dtbo
+
+sirius-sdm710-overlay.dtbo-base := sdm710.dtb
+sirius-sdm670-overlay.dtbo-base := sdm670.dtb
+grus-sdm710-overlay.dtbo-base := sdm710.dtb
+grus-sdm712-overlay.dtbo-base := sdm710.dtb
+pyxis-sdm710-overlay.dtbo-base := sdm710.dtb
+vela-sdm710-overlay.dtbo-base := sdm710.dtb
+endif # CONFIG_BUILD_ARM64_DT_OVERLAY
+endif # CONFIG_MACH_XIAOMI_SDM710
+
+else # CONFIG_MACH_XIAOMI
+
 dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
@@ -673,6 +696,8 @@ dtb-$(CONFIG_ARCH_SDM429) += sdm429-mtp.dtb \
 endif
 
 dtb-$(CONFIG_ARCH_SDM845_VM) += sdm845-vm.dtb
+
+endif # CONFIG_MACH_XIAOMI
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
