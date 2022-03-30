@@ -1332,7 +1332,7 @@ static void ufs_qcom_dev_ref_clk_ctrl(struct ufs_qcom_host *host, bool enable)
 			    UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE)
 				usleep_range(50, 60);
 			else
-				udelay(1);
+				udelay(100);
 		}
 
 		host->is_dev_ref_clk_enabled = enable;
