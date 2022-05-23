@@ -56,8 +56,8 @@
 #define	PPC_DRIVER_MTPLLSRC			0x00000400
 #define	PPC_DRIVER_CFGDEV_NONCRC	0x00000101
 
-#define TAS2557_CAL_NAME    "/persist/audio/tas2557_cal.bin"
-#define TAS2557_CAL_NAME_NEW    "/persist/audio/tas2557_cal_new.bin"
+#define TAS2557_CAL_NAME    "/mnt/vendor/persist/audio/tas2557_cal.bin"
+#define TAS2557_CAL_NAME_NEW    "/mnt/vendor/persist/audio/tas2557_cal_new.bin"
 #define RESTART_MAX 3
 
 static int tas2557_load_calibration(struct tas2557_priv *pTAS2557,
