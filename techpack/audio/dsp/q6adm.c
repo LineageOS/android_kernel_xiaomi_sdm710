@@ -952,6 +952,50 @@ dolby_dap_send_param_return:
 	return rc;
 }
 
+#if CONFIG_MSM_CSPL
+int crus_adm_set_params(int port_id, int copp_idx, uint32_t module_id,
+							uint32_t param_id, char *params,
+							uint32_t params_length)
+{
+	int ret = 0;
+	uint32_t *update_param_data = NULL;
+	uint32_t *param_data = NULL;
+	uint32_t param_size = params_length +
+			sizeof(struct adm_param_data_v5);
+
+	param_data = kzalloc(param_size, GFP_KERNEL);
+	if (!param_data)
+		return -ENOMEM;
+	update_param_data = (uint32_t *)param_data;
+	*update_param_data++ = module_id;
+	*update_param_data++ = param_id;
+    *update_param_data++ = params_length;
+    memcpy((char *)param_data + sizeof(struct adm_param_data_v5), params, params_length);
+    ret = adm_send_params_v5(port_id, copp_idx,
+            (char *)param_data, param_size);
+    if (ret) {
+		pr_err("%s: Setting param failed with err=%d\n",
+				__func__, ret);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+exit:
+	kfree(param_data);
+	return ret;
+}
+
+int crus_adm_get_params(int port_id, int copp_idx, uint32_t module_id,
+							uint32_t param_id, char *params,
+							uint32_t params_length,
+							uint32_t client_id)
+{
+	return adm_get_params(port_id, copp_idx,
+				module_id, param_id, params_length, params);
+}
+EXPORT_SYMBOL(crus_adm_get_params);
+#endif
+
 int adm_send_params_v5(int port_id, int copp_idx, char *params,
 			      uint32_t params_length)
 {

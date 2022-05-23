@@ -42,4 +42,36 @@ obj-$(CONFIG_DOLBY_DS2) += msm-ds2-dap-config.o
 obj-$(CONFIG_DOLBY_LICENSE) += msm-ds2-dap-config.o
 obj-$(CONFIG_DTS_SRS_TM) += msm-dts-srs-tm-config.o
 obj-$(CONFIG_QTI_PP) += msm-qti-pp-config.o
+
+ifeq ($(CONFIG_MACH_XIAOMI_PYXIS), y)
+AUDIO_FEATURE_ENABLED_SPKR_PROTECTION := true
+endif
+ifeq ($(CONFIG_MACH_XIAOMI_VELA), y)
+AUDIO_FEATURE_ENABLED_SPKR_PROTECTION := true
+endif
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_SPKR_PROTECTION)),true)
+obj-$(CONFIG_SND_SOC_QDSP6V2) += tas2562-algo.o
+obj-$(CONFIG_SND_SOC_QDSP6V2) += tas2562-calib.o
+endif
+
+ifeq ($(CONFIG_MACH_XIAOMI_GRUS), y)
+ccflags-y += -DCONFIG_SND_SOC_CS35L41_FOR_GRUS
+endif
+
+ifeq ($(CONFIG_MACH_XIAOMI_GRUS), y)
+ccflags-y += -DAUDIO_FEATURE_SUPPORT_24BIT
+endif
+
+ifeq ($(CONFIG_MACH_XIAOMI_PYXIS), y)
+ccflags-y += -DAUDIO_FEATURE_SUPPORT_24BIT
+endif
+
+ifeq ($(CONFIG_MACH_XIAOMI_VELA), y)
+ccflags-y += -DAUDIO_FEATURE_SUPPORT_24BIT
+endif
+
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_SPKR_PROTECTION)),true)
+ccflags-y += -DCONFIG_SND_SOC_TAS2562_FOR_PYXIS
+endif
+
 obj-y += codecs/

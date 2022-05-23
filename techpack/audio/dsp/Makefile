@@ -11,3 +11,23 @@ ifeq ($(CONFIG_ARCH_SDM845), y)
 obj-$(CONFIG_MSM_AVTIMER) += avtimer.o
 endif
 obj-$(CONFIG_MSM_QDSP6V2_CODECS)  += codecs/
+
+ifeq ($(CONFIG_MACH_XIAOMI_SDM710), y)
+obj-$(CONFIG_SND_SOC_MSM_QDSP6V2_INTF) += elliptic/ apr_elliptic.o
+
+ifdef CONFIG_MSM_CSPL
+obj-$(CONFIG_SND_SOC_MSM_QDSP6V2_INTF) += msm-cirrus-playback.o
+endif
+
+ifeq ($(CONFIG_MACH_XIAOMI_PYXIS), y)
+AUDIO_FEATURE_ENABLED_SPKR_PROTECTION := true
+endif
+
+ifeq ($(CONFIG_MACH_XIAOMI_VELA), y)
+AUDIO_FEATURE_ENABLED_SPKR_PROTECTION := true
+endif
+
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_SPKR_PROTECTION)),true)
+ccflags-y += -DCONFIG_SND_SOC_TAS2562_FOR_PYXIS
+endif
+endif
