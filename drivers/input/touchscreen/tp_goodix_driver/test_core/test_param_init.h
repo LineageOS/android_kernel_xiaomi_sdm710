@@ -18,6 +18,7 @@ extern "C" {
 #include "test_order.h"
 
 /*************************************Public methods start********************************************/
+#ifdef CONFIG_TOUCHSCREEN_GOODIX_GTX8_DEBUG
 /*init test item*/
 extern s32 init_test_item(PST_TEST_PROC_DATA p_test_proc_data,
 				PST_TEST_PARAM p_test_param);
@@ -38,6 +39,45 @@ extern s32 release_test_proc_data(PST_TEST_PROC_DATA *
 extern s32 test_process(void *p_drv_dev);
 extern int get_tp_rawdata(void *p_drv_dev, char *buf, int *buf_size);
 extern int get_tp_testcfg(void *p_drv_dev, char *buf, int *buf_size);
+#else
+static inline s32 init_test_item(PST_TEST_PROC_DATA p_test_proc_data,
+				PST_TEST_PARAM p_test_param)
+{
+	return 0;
+}
+static inline s32 release_test_item(PST_TEST_PROC_DATA p_test_proc_data)
+{
+	return 0;
+}
+static inline s32 register_test_item_finished_func(PST_TEST_PROC_DATA
+				p_test_proc_data)
+{
+	return 0;
+}
+static inline s32 init_test_proc_data(PST_TEST_PROC_DATA *pp_test_proc_data,
+				PST_TEST_PARAM *pp_test_param,
+				void *p_drv_dev)
+{
+	return 0;
+}
+static inline s32 release_test_proc_data(PST_TEST_PROC_DATA *
+				  pp_test_proc_data)
+{
+	return 0;
+}
+static inline s32 test_process(void *p_drv_dev)
+{
+	return 0;
+}
+static inline int get_tp_rawdata(void *p_drv_dev, char *buf, int *buf_size)
+{
+	return 0;
+}
+static inline int get_tp_testcfg(void *p_drv_dev, char *buf, int *buf_size)
+{
+	return 0;
+}
+#endif
 /*************************************Public methods end********************************************/
 #ifdef __cplusplus
 }

@@ -42,4 +42,12 @@ config TOUCHSCREEN_GOODIX_GTX8_TOOLS
 
 	  To compile this driver as a module, choose M here.
 
+config TOUCHSCREEN_GOODIX_GTX8_DEBUG
+	bool "Goodix touch debugging"
+	default n
+	help
+	  Say Y here to enable debugging.
+
+	  If unsure, say N.
+
 endif
