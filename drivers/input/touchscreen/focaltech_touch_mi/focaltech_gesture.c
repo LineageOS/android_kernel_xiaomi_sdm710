@@ -33,9 +33,7 @@
 * 1.Included header files
 *****************************************************************************/
 #include "focaltech_core.h"
-#ifdef CONFIG_TOUCHSCREEN_COMMON
 #include <linux/input/tp_common.h>
-#endif
 #if FTS_GESTURE_EN
 /******************************************************************************
 * Private constant and macro definitions using #define
@@ -132,7 +130,6 @@ static struct attribute_group fts_gesture_group = {
 	.attrs = fts_gesture_mode_attrs,
 };
 
-#ifdef CONFIG_TOUCHSCREEN_COMMON
 static ssize_t double_tap_show(struct kobject *kobj,
                                struct kobj_attribute *attr, char *buf)
 {
@@ -157,7 +154,6 @@ static struct tp_common_ops double_tap_ops = {
 	.show = double_tap_show,
 	.store = double_tap_store,
 };
-#endif
 
 /************************************************************************
 * Name: fts_gesture_show
@@ -638,9 +634,7 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 {
 	struct i2c_client *client = ts_data->client;
 	struct input_dev *input_dev = ts_data->input_dev;
-#ifdef CONFIG_TOUCHSCREEN_COMMON
 	int ret;
-#endif
 
 	FTS_FUNC_ENTER();
 	input_set_capability(input_dev, EV_KEY, KEY_POWER);
@@ -676,13 +670,11 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 
 	fts_create_gesture_sysfs(client);
 
-#ifdef CONFIG_TOUCHSCREEN_COMMON
 	ret = tp_common_set_double_tap_ops(&double_tap_ops);
 	if (ret < 0) {
 		FTS_ERROR("%s: Failed to create double_tap node err=%d\n",
 		          __func__, ret);
 	}
-#endif
 
 	fts_gesture_data.mode = DISABLE;
 	fts_gesture_data.active = DISABLE;

@@ -4,21 +4,22 @@
 
 config TOUCHSCREEN_FTS_MI
         bool "Focaltech Touchscreen"
-		depends on I2C
-		default n
-		help
-		  Say Y here if you have Focaltech touch panel.
-		  If unsure, say N.
+	depends on I2C
+	default n
+	select TOUCHSCREEN_COMMON
+	help
+	  Say Y here if you have Focaltech touch panel.
+	  If unsure, say N.
 
 config TOUCHSCREEN_FTS_FOD
         bool "Focaltech Touchscreen Fod func"
-		depends on TOUCHSCREEN_FTS_MI
-		default n
-		help
-		  Say Y here if you support fod function.
-		  If unsure, say N.
+	depends on TOUCHSCREEN_FTS_MI
+	default n
+	help
+	 Say Y here if you support fod function.
+	 If unsure, say N.
 
 config TOUCHSCREEN_FTS_MI_DIRECTORY
-    string "Focaltech ts directory name"
-    default "focaltech_touch_mi"
-    depends on TOUCHSCREEN_FTS_MI
+	string "Focaltech ts directory name"
+	default "focaltech_touch_mi"
+	depends on TOUCHSCREEN_FTS_MI
