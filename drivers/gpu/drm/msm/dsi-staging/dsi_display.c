@@ -4760,32 +4760,48 @@ static int dsi_display_sysfs_init(struct dsi_display *display)
 	struct device *soc_dev = dev->parent;
 
 	if (!soc_dev)
-		pr_err("[%s] unable to determine parent device\n", display->name);
+		pr_err("[%s] unable to determine parent device\n",
+		       display->name);
 	else {
-		struct kobject *dsi_kobj = &dev->kobj;
-		struct kernfs_node *dsi_node = dsi_kobj->sd;
+		struct kernfs_node *dsi_node = dev->kobj.sd;
 
 		kernfs_get(dsi_node);
 
-		dsi_link = kernfs_create_link(soc_dev->kobj.sd, "soc:qcom,dsi-display-primary",
+		dsi_link = kernfs_create_link(soc_dev->kobj.sd,
+					      "soc:qcom,dsi-display-primary",
 					      dsi_node);
 		if (IS_ERR_OR_NULL(dsi_link))
-			pr_err("[%s] unable to create dsi-display symlink\n", display->name);
+			pr_err("[%s] unable to create dsi-display symlink\n",
+			       display->name);
 
 		kernfs_put(dsi_node);
 	}
 
 	rc = sysfs_create_group(&dev->kobj, &display_fs_attrs_group);
 	if (rc)
-		pr_err("failed to create display device attributes");
+		goto err_sysfs_disp_fs;
 
-	if (display->panel->panel_mode == DSI_OP_CMD_MODE)
+	if (display->panel->panel_mode == DSI_OP_CMD_MODE) {
 		rc = sysfs_create_group(&dev->kobj,
 			&dynamic_dsi_clock_fs_attrs_group);
+		if (rc)
+			goto err_sysfs_dyn_dsi_clk;
+	}
+
 	pr_debug("[%s] dsi_display_sysfs_init:%d,panel mode:%d\n",
 		display->name, rc, display->panel->panel_mode);
 	return rc;
 
+err_sysfs_dyn_dsi_clk:
+	sysfs_remove_group(&dev->kobj, &display_fs_attrs_group);
+err_sysfs_disp_fs:
+	if (!IS_ERR_OR_NULL(dsi_link))
+		kernfs_remove_by_name(dsi_link->parent, dsi_link->name);
+
+	pr_err("[%s] failed to create display device attributes\n",
+	       display->name);
+
+	return rc;
 }
 
 static int dsi_display_sysfs_deinit(struct dsi_display *display)
