@@ -1846,6 +1846,8 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command",
 	"qcom,mdss-dsi-post-mode-switch-on-command",
+	"qcom,mdss-dsi-dispparam-hbm-fod-off-doze-hbm-on-command",
+	"qcom,mdss-dsi-dispparam-hbm-fod-off-doze-lbm-on-command",
 	"qcom,mdss-dsi-dispparam-hbm-on-command",
 	"qcom,mdss-dsi-dispparam-hbm-off-command",
 };
@@ -1872,6 +1874,8 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command-state",
 	"qcom,mdss-dsi-post-mode-switch-on-command-state",
+	"qcom,mdss-dsi-dispparam-hbm-fod-off-doze-hbm-on-command-state",
+	"qcom,mdss-dsi-dispparam-hbm-fod-off-doze-lbm-on-command-state",
 	"qcom,mdss-dsi-dispparam-hbm-on-command-state",
 	"qcom,mdss-dsi-dispparam-hbm-off-command-state",
 };
