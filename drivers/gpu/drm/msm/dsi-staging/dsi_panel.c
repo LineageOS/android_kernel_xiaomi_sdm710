@@ -2450,8 +2450,10 @@ error:
 	return rc;
 }
 
-static int dsi_panel_parse_fod_dim_lut(struct dsi_panel *panel,
-		const struct device_node *of_node)
+static int dsi_panel_parse_dim_lut(struct dsi_panel *panel,
+				   const struct device_node *of_node,
+				   struct brightness_alpha_pair **plut,
+				   u32 *pcount, const char *lut_name)
 {
 	struct brightness_alpha_pair *lut;
 	u32 *array;
@@ -2460,7 +2462,7 @@ static int dsi_panel_parse_fod_dim_lut(struct dsi_panel *panel,
 	int rc;
 	int i;
 
-	len = of_property_count_u32_elems(of_node, "qcom,disp-fod-dim-lut");
+	len = of_property_count_u32_elems(of_node, lut_name);
 	if (len <= 0 || len % BRIGHTNESS_ALPHA_PAIR_LEN) {
 		rc = -EINVAL;
 		pr_err("[%s] invalid number of elements, rc=%d\n",
@@ -2476,8 +2478,7 @@ static int dsi_panel_parse_fod_dim_lut(struct dsi_panel *panel,
 		goto alloc_array_fail;
 	}
 
-	rc = of_property_read_u32_array(of_node, "qcom,disp-fod-dim-lut",
-			array, len);
+	rc = of_property_read_u32_array(of_node, lut_name, array, len);
 	if (rc) {
 		pr_err("[%s] failed to allocate memory, rc=%d\n",
 				panel->name, rc);
@@ -2497,8 +2498,8 @@ static int dsi_panel_parse_fod_dim_lut(struct dsi_panel *panel,
 		pair->alpha = array[i * BRIGHTNESS_ALPHA_PAIR_LEN + 1];
 	}
 
-	panel->fod_dim_lut = lut;
-	panel->fod_dim_lut_count = count;
+	*plut = lut;
+	*pcount = count;
 
 alloc_lut_fail:
 read_fail:
@@ -2506,10 +2507,26 @@ read_fail:
 alloc_array_fail:
 count_fail:
 	if (rc) {
-		panel->fod_dim_lut = NULL;
-		panel->fod_dim_lut_count = 0;
+		*plut = NULL;
+		*pcount = 0;
 	}
 	return rc;
+}
+
+static int dsi_panel_parse_fod_dim_lut(struct dsi_panel *panel,
+				       const struct device_node *of_node)
+{
+	return dsi_panel_parse_dim_lut(panel, of_node, &panel->fod_dim_lut,
+				       &panel->fod_dim_lut_count,
+				       "qcom,disp-fod-dim-lut");
+}
+
+static int dsi_panel_parse_dc_dim_lut(struct dsi_panel *panel,
+				      struct device_node *of_node)
+{
+	return dsi_panel_parse_dim_lut(panel, of_node, &panel->dc_dim_lut,
+				       &panel->dc_dim_lut_count,
+				       "qcom,disp-dc-dim-lut");
 }
 
 static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
@@ -2611,6 +2628,10 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 		panel->bl_config.bl_dc_thresh = val;
 	else
 		pr_err("[%s] dc-threshold unspecified\n", panel->name);
+
+	rc = dsi_panel_parse_dc_dim_lut(panel, of_node);
+	if (rc)
+		pr_err("[%s failed to parse dc dim lut\n", panel->name);
 
 	if (panel->bl_config.type == DSI_BACKLIGHT_PWM) {
 		rc = dsi_panel_parse_bl_pwm_config(&panel->bl_config, of_node);
