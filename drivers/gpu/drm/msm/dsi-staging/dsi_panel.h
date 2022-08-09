@@ -108,6 +108,7 @@ struct dsi_backlight_config {
 	u32 bl_scale_ad;
 	u32 bl_doze_lpm;
 	u32 bl_doze_hbm;
+	u32 bl_dc_thresh;
 
 	int en_gpio;
 	bool dcs_type_ss;
