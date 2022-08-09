@@ -680,8 +680,4 @@ int dsi_display_get_panel_vfp(void *display,
 int dsi_display_get_dim_layer_alpha(void *display, enum msm_dim_layer_type type,
 				    u32 *alpha);
 
-struct dsi_display *get_main_display(void);
-
-void dsi_display_set_fod_ui(struct dsi_display *display, bool status);
-
 #endif /* _DSI_DISPLAY_H_ */
