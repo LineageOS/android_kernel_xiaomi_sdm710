@@ -1555,7 +1555,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	spin_lock_init(&ts_data->irq_lock);
 	mutex_init(&ts_data->report_mutex);
-	mutex_init(&ts_data->fod_mutex);
 
 	ret = fts_input_init(ts_data);
 	if (ret) {
@@ -1818,7 +1817,6 @@ static int fts_ts_suspend(struct device *dev)
 		FTS_INFO("fw upgrade in process, can't suspend");
 		return 0;
 	}
-	mutex_lock(&ts_data->fod_mutex);
 	fts_irq_disable_sync();
 
 	ts_data->fod_point_released = false;
@@ -1856,7 +1854,6 @@ release_finger:
 	mutex_lock(&fts_data->report_mutex);
 	fts_release_all_finger();
 	mutex_unlock(&fts_data->report_mutex);
-	mutex_unlock(&ts_data->fod_mutex);
 	FTS_FUNC_EXIT();
 	return 0;
 }
