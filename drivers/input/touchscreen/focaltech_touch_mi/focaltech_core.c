@@ -56,23 +56,6 @@
 #define FTS_I2C_VTG_MAX_UV                  1800000
 #endif
 
-#define INPUT_EVENT_START			0
-#define INPUT_EVENT_SENSITIVE_MODE_OFF		0
-#define INPUT_EVENT_SENSITIVE_MODE_ON		1
-#define INPUT_EVENT_STYLUS_MODE_OFF		2
-#define INPUT_EVENT_STYLUS_MODE_ON		3
-#define INPUT_EVENT_WAKUP_MODE_OFF		4
-#define INPUT_EVENT_WAKUP_MODE_ON		5
-#define INPUT_EVENT_COVER_MODE_OFF		6
-#define INPUT_EVENT_COVER_MODE_ON		7
-#define INPUT_EVENT_SLIDE_FOR_VOLUME		8
-#define INPUT_EVENT_DOUBLE_TAP_FOR_VOLUME		9
-#define INPUT_EVENT_SINGLE_TAP_FOR_VOLUME		10
-#define INPUT_EVENT_LONG_SINGLE_TAP_FOR_VOLUME		11
-#define INPUT_EVENT_PALM_OFF		12
-#define INPUT_EVENT_PALM_ON		13
-#define INPUT_EVENT_END				13
-
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
@@ -1164,63 +1147,6 @@ static int fts_irq_registration(struct fts_ts_data *ts_data)
 	return ret;
 }
 
-#if FTS_GESTURE_EN
-static void fts_switch_mode_work(struct work_struct *work)
-{
-	struct fts_mode_switch *ms = container_of(work, struct fts_mode_switch, switch_mode_work);
-	unsigned char value = ms->mode;
-	bool enable = false;
-
-	FTS_INFO("%s mode %d", __func__, value);
-
-	if (value >= INPUT_EVENT_WAKUP_MODE_OFF && value <= INPUT_EVENT_WAKUP_MODE_ON) {
-		enable = !!(value - INPUT_EVENT_WAKUP_MODE_OFF);
-		fts_gesture_enable(enable);
-		ms->ts_data->lpwg_mode = enable;
-	}
-
-	if (ms != NULL) {
-		kfree(ms);
-		ms = NULL;
-	}
-}
-
-static int fts_input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
-{
-	struct fts_ts_data *ts_data = input_get_drvdata(dev);
-	struct fts_mode_switch *ms;
-
-	FTS_INFO("set input event value = %d", value);
-
-	if (!ts_data) {
-		FTS_ERROR("fts_ts_data is NULL");
-		return 0;
-	}
-
-	if (type == EV_SYN && code == SYN_CONFIG) {
-		if (value >= INPUT_EVENT_START && value <= INPUT_EVENT_END) {
-			ms = (struct fts_mode_switch *)
-			    kmalloc(sizeof(struct fts_mode_switch), GFP_ATOMIC);
-
-			if (ms != NULL) {
-				ms->ts_data = ts_data;
-				ms->mode = (unsigned char)value;
-				INIT_WORK(&ms->switch_mode_work, fts_switch_mode_work);
-				schedule_work(&ms->switch_mode_work);
-			} else {
-				FTS_ERROR("failed in allocating memory for switching mode");
-				return -ENOMEM;
-			}
-		} else {
-			FTS_ERROR("%s Invalid event value\n", __func__);
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-#endif
-
 /*****************************************************************************
 *  Name: fts_input_init
 *  Brief: input device init
@@ -1248,9 +1174,6 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 	input_dev->name = FTS_DRIVER_NAME;
 	input_dev->id.bustype = BUS_I2C;
 	input_dev->dev.parent = &ts_data->client->dev;
-#if FTS_GESTURE_EN
-	input_dev->event = fts_input_event;
-#endif
 	input_set_drvdata(input_dev, ts_data);
 
 	__set_bit(EV_SYN, input_dev->evbit);

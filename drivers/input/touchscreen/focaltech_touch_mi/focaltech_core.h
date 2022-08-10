@@ -227,12 +227,6 @@ struct fts_ts_data {
 	int aod_status;
 };
 
-struct fts_mode_switch {
-	struct fts_ts_data *ts_data;
-	unsigned char mode;
-	struct work_struct switch_mode_work;
-};
-
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
