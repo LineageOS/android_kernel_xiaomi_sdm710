@@ -104,12 +104,6 @@
 #define FTS_DEBUG_EN                            1
 
 /*
- * Linux MultiTouch Protocol
- * 1: Protocol B(default), 0: Protocol A
- */
-#define FTS_MT_PROTOCOL_B_EN                    1
-
-/*
  * Report Pressure in multitouch
  * 1:enable(default),0:disable
 */
@@ -121,28 +115,6 @@
  */
 #define FTS_GESTURE_EN                          1
 
-/*
- * ESD check & protection
- * default: disable
- */
-#define FTS_ESDCHECK_EN                         0
-
-/*
- * Production test enable
- * 1: enable, 0:disable(default)
- */
-#define FTS_TEST_EN                             0
-
-/*
- * Glove mode enable
- * 1: enable, 0:disable(default)
- */
-#define FTS_GLOVE_EN                            0
-/*
- * cover enable
- * 1: enable, 0:disable(default)
- */
-#define FTS_COVER_EN                            0
 /*
  * Charger enable
  * 1: enable, 0:disable(default)
@@ -175,11 +147,6 @@
  * auto upgrade, please keep enable
  */
 #define FTS_AUTO_UPGRADE_EN                     1
-
-/*
- * auto upgrade for lcd cfg
- */
-#define FTS_AUTO_LIC_UPGRADE_EN                 0
 
 /*
  * Check vendor_id number

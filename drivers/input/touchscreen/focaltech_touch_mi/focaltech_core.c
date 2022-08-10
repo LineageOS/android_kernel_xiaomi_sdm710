@@ -36,9 +36,6 @@
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #include <linux/msm_drm_notify.h>
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-#include <linux/earlysuspend.h>
-#define FTS_SUSPEND_LEVEL 1	/* Early-suspend level */
 #endif
 #include <linux/backlight.h>
 #include <linux/input/tp_common.h>
@@ -67,9 +64,7 @@ extern int fts_charger_mode_set(struct i2c_client *client, bool on);
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
-#ifndef CONFIG_FACTORY_BUILD
 static int fts_ts_clear_buffer(void);
-#endif
 static void fts_release_all_finger(void);
 static int fts_ts_suspend(struct device *dev);
 static int fts_ts_resume(struct device *dev);
@@ -621,9 +616,7 @@ static void fts_show_touch_buffer(u8 *buf, int point_num)
 static void fts_release_all_finger(void)
 {
 	struct input_dev *input_dev = fts_data->input_dev;
-#if FTS_MT_PROTOCOL_B_EN
 	u32 finger_count = 0;
-#endif
 
 	FTS_FUNC_ENTER();
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
@@ -632,14 +625,10 @@ static void fts_release_all_finger(void)
 	fts_data->fod_y = 0;
 	fts_data->overlap_area = 0;
 #endif
-#if FTS_MT_PROTOCOL_B_EN
 	for (finger_count = 0; finger_count < fts_data->pdata->max_touch_number; finger_count++) {
 		input_mt_slot(input_dev, finger_count);
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
 	}
-#else
-	input_mt_sync(input_dev);
-#endif
 	input_report_key(input_dev, BTN_TOUCH, 0);
 	input_sync(input_dev);
 	FTS_FUNC_EXIT();
@@ -683,8 +672,7 @@ static int fts_input_report_key(struct fts_ts_data *data, int index)
 	return -EINVAL;
 }
 
-#if FTS_MT_PROTOCOL_B_EN
-static int fts_input_report_b(struct fts_ts_data *data)
+static void fts_report_event(struct fts_ts_data *data)
 {
 	int i = 0;
 	int uppoint = 0;
@@ -769,69 +757,8 @@ static int fts_input_report_b(struct fts_ts_data *data)
 	}
 
 	input_sync(data->input_dev);
-	return 0;
 }
 
-#else
-static int fts_input_report_a(struct fts_ts_data *data)
-{
-	int i = 0;
-	int touchs = 0;
-	bool va_reported = false;
-	u32 key_y_coor = data->pdata->key_y_coord;
-	struct ts_event *events = data->events;
-
-	for (i = 0; i < data->touch_point; i++) {
-		if (KEY_EN(data) && TOUCH_IS_KEY(events[i].y, key_y_coor)) {
-			fts_input_report_key(data, i);
-			continue;
-		}
-
-		va_reported = true;
-		if (EVENT_DOWN(events[i].flag)) {
-			input_report_abs(data->input_dev, ABS_MT_TRACKING_ID, events[i].id);
-#if FTS_REPORT_PRESSURE_EN
-			if (events[i].p <= 0) {
-				events[i].p = 0x3f;
-			}
-			input_report_abs(data->input_dev, ABS_MT_PRESSURE, events[i].p);
-#endif
-			if (events[i].area <= 0) {
-				events[i].area = 0x09;
-			}
-			input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, events[i].area);
-
-			input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
-			input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
-
-			input_mt_sync(data->input_dev);
-
-			FTS_DEBUG("[A]P%d(%d, %d)[p:%d,tm:%d] DOWN!", events[i].id, events[i].x, events[i].y,
-				  events[i].p, events[i].area);
-			touchs++;
-		}
-	}
-
-	/* last point down, current no point but key */
-	if (data->touchs && !touchs) {
-		va_reported = true;
-	}
-	data->touchs = touchs;
-
-	if (va_reported) {
-		if (EVENT_NO_DOWN(data)) {
-			FTS_DEBUG("[A]Points All Up!");
-			input_report_key(data->input_dev, BTN_TOUCH, 0);
-			input_mt_sync(data->input_dev);
-		} else {
-			input_report_key(data->input_dev, BTN_TOUCH, 1);
-		}
-	}
-
-	input_sync(data->input_dev);
-	return 0;
-}
-#endif
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 static int fts_read_and_report_foddata(struct fts_ts_data *data)
 {
@@ -985,10 +912,6 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 #endif
 #endif
 
-#if FTS_POINT_REPORT_CHECK_EN
-	fts_prc_queue_work(data);
-#endif
-
 	data->point_num = 0;
 	data->touch_point = 0;
 
@@ -1051,22 +974,6 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 }
 
 /*****************************************************************************
-*  Name: fts_report_event
-*  Brief:
-*  Input:
-*  Output:
-*  Return:
-*****************************************************************************/
-static void fts_report_event(struct fts_ts_data *data)
-{
-#if FTS_MT_PROTOCOL_B_EN
-	fts_input_report_b(data);
-#else
-	fts_input_report_a(data);
-#endif
-}
-
-/*****************************************************************************
 *  Name: fts_ts_interrupt
 *  Brief:
 *  Input:
@@ -1082,9 +989,6 @@ static irqreturn_t fts_ts_interrupt(int irq, void *data)
 		FTS_ERROR("[INTR]: Invalid fts_ts_data");
 		return IRQ_HANDLED;
 	}
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_set_intr(1);
-#endif
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
 	pm_wakeup_event(&ts_data->client->dev, MAX_WAIT_TIME);
 	if (!ts_data->IRQ_skipped && spin_trylock(&i2c_resume_lock)) {
@@ -1113,9 +1017,6 @@ handleIRQ:
 		fts_report_event(ts_data);
 		mutex_unlock(&ts_data->report_mutex);
 	}
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_set_intr(0);
-#endif
 
 	return IRQ_HANDLED;
 }
@@ -1187,11 +1088,7 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 		for (key_num = 0; key_num < pdata->key_number; key_num++)
 			input_set_capability(input_dev, EV_KEY, pdata->keys[key_num]);
 	}
-#if FTS_MT_PROTOCOL_B_EN
 	input_mt_init_slots(input_dev, pdata->max_touch_number, INPUT_MT_DIRECT);
-#else
-	input_set_abs_params(input_dev, ABS_MT_TRACKING_ID, 0, 0x0f, 0, 0);
-#endif
 	input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, pdata->x_max - 1, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max - 1, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 0xFF, 0, 0);
@@ -1777,38 +1674,6 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 
 	return 0;
 }
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-/*****************************************************************************
-*  Name: fts_ts_early_suspend
-*  Brief:
-*  Input:
-*  Output:
-*  Return:
-*****************************************************************************/
-static void fts_ts_early_suspend(struct early_suspend *handler)
-{
-	struct fts_ts_data *data = container_of(handler,
-						struct fts_ts_data,
-						early_suspend);
-
-	fts_ts_suspend(&data->client->dev);
-}
-
-/*****************************************************************************
-*  Name: fts_ts_late_resume
-*  Brief:
-*  Input:
-*  Output:
-*  Return:
-*****************************************************************************/
-static void fts_ts_late_resume(struct early_suspend *handler)
-{
-	struct fts_ts_data *data = container_of(handler,
-						struct fts_ts_data,
-						early_suspend);
-
-	fts_ts_resume(&data->client->dev);
-}
 #endif
 
 static int check_is_focal_touch(struct fts_ts_data *ts_data)
@@ -2006,14 +1871,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	}
 #endif
 
-#if FTS_POINT_REPORT_CHECK_EN
-	ret = fts_point_report_check_init(ts_data);
-	if (ret) {
-		FTS_ERROR("init point report check fail");
-		goto err_debugfs_create;
-	}
-#endif
-
 	ret = fts_ex_mode_init(client);
 	if (ret) {
 		FTS_ERROR("init glove/cover/charger fail");
@@ -2027,21 +1884,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	}
 #endif
 
-#if FTS_TEST_EN
-	ret = fts_test_init(client);
-	if (ret) {
-		FTS_ERROR("init production test fail");
-		goto err_debugfs_create;
-	}
-#endif
-
-#if FTS_ESDCHECK_EN
-	ret = fts_esdcheck_init(ts_data);
-	if (ret) {
-		FTS_ERROR("init esd check fail");
-		goto err_debugfs_create;
-	}
-#endif
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
 	/*
 	 *create workqueue thread for trying to read touch data
@@ -2085,11 +1927,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	if (ret) {
 		FTS_ERROR("[FB]Unable to register fb_notifier: %d", ret);
 	}
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-	ts_data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + FTS_SUSPEND_LEVEL;
-	ts_data->early_suspend.suspend = fts_ts_early_suspend;
-	ts_data->early_suspend.resume = fts_ts_late_resume;
-	register_early_suspend(&ts_data->early_suspend);
 #endif
 	ts_data->bl_notif.notifier_call = fts_bl_state_chg_callback;
 	if (backlight_register_notifier(&ts_data->bl_notif) < 0) {
@@ -2185,10 +2022,6 @@ static int fts_ts_remove(struct i2c_client *client)
 
 	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
 
-#if FTS_POINT_REPORT_CHECK_EN
-	fts_point_report_check_exit(ts_data);
-#endif
-
 #if FTS_APK_NODE_EN
 	fts_release_apk_debug_channel(ts_data);
 #endif
@@ -2206,21 +2039,11 @@ static int fts_ts_remove(struct i2c_client *client)
 	fts_fwupg_exit(ts_data);
 #endif
 
-#if FTS_TEST_EN
-	fts_test_exit(client);
-#endif
-
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_exit(ts_data);
-#endif
-
 	backlight_unregister_notifier(&ts_data->bl_notif);
 	power_supply_unreg_notifier(&ts_data->power_supply_notifier);
 #if defined(CONFIG_DRM) && defined(DRM_ADD_COMPLETE)
 	if (msm_drm_unregister_client(&ts_data->fb_notif))
 		FTS_ERROR("Error occurred while unregistering fb_notifier.");
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&ts_data->early_suspend);
 #endif
 
 	free_irq(client->irq, ts_data);
@@ -2251,7 +2074,7 @@ static int fts_ts_remove(struct i2c_client *client)
 	FTS_FUNC_EXIT();
 	return 0;
 }
-#ifndef CONFIG_FACTORY_BUILD
+
 /*****************************************************************************
 * Name: fts_ts_clear_buffer
 * Brief: during irq disabled, FTS_REG_INT_ACK(0x3E) register will store three frames
@@ -2274,7 +2097,6 @@ static int fts_ts_clear_buffer(void)
 	}
 	return ret;
 }
-#endif
 
 /*****************************************************************************
 *  Name: fts_ts_suspend
@@ -2301,13 +2123,10 @@ static int fts_ts_suspend(struct device *dev)
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	mutex_lock(&ts_data->fod_mutex);
 #endif
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_suspend();
-#endif
 	fts_irq_disable_sync();
 
 	ts_data->fod_point_released = false;
-#ifndef CONFIG_FACTORY_BUILD
+
 #if FTS_GESTURE_EN
 	if (fts_gesture_suspend(ts_data->client) == 0) {
 		ts_data->suspended = true;
@@ -2334,25 +2153,15 @@ static int fts_ts_suspend(struct device *dev)
 	goto release_finger;
 #endif
 sleep_mode:
-#endif
 #if FTS_PINCTRL_EN
 	fts_pinctrl_select_suspend(ts_data);
 #endif
-#if defined(FTS_POWER_SOURCE_CUST_EN) && defined(CONFIG_FACTORY_BUILD)
-	ret = fts_power_source_ctrl(ts_data, DISABLE);
-	if (ret < 0) {
-		FTS_ERROR("power off fail, ret=%d", ret);
-	}
-#else
 	/* TP enter sleep mode */
 	ret = fts_i2c_write_reg(ts_data->client, FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP_VALUE);
 	if (ret < 0)
 		FTS_ERROR("set TP to sleep mode fail, ret=%d", ret);
-#endif
 	ts_data->suspended = true;
-#ifndef CONFIG_FACTORY_BUILD
 release_finger:
-#endif
 	mutex_lock(&fts_data->report_mutex);
 	fts_release_all_finger();
 	mutex_unlock(&fts_data->report_mutex);
@@ -2379,9 +2188,6 @@ static int fts_ts_resume(struct device *dev)
 		FTS_DEBUG("Already in awake state");
 		return 0;
 	}
-#if defined(FTS_POWER_SOURCE_CUST_EN) && defined(CONFIG_FACTORY_BUILD)
-	fts_power_source_ctrl(ts_data, ENABLE);
-#endif
 #if FTS_PINCTRL_EN
 	fts_pinctrl_select_normal(ts_data);
 #endif
@@ -2407,9 +2213,6 @@ static int fts_ts_resume(struct device *dev)
 	ts_data->IRQ_skipped = false;
 #endif
 	fts_tp_state_recovery(ts_data->client);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_resume();
-#endif
 #if FTS_GESTURE_EN
 	if (fts_gesture_resume(ts_data->client) == 0) {
 		ts_data->suspended = false;

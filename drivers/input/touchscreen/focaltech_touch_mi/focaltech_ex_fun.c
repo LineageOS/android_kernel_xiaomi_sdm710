@@ -78,7 +78,6 @@ static struct rwreg_operation_t {
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 /************************************************************************
 *   Name: fts_debug_write
 *  Brief:interface of write proc
@@ -111,13 +110,6 @@ static ssize_t fts_debug_write(struct file *filp, const char __user *buff, size_
 	switch (ts_data->proc_opmode) {
 	case PROC_SET_TEST_FLAG:
 		FTS_INFO("[APK]: PROC_SET_TEST_FLAG = %x!!", writebuf[1]);
-#if FTS_ESDCHECK_EN
-		if (writebuf[1] == 0) {
-			fts_esdcheck_switch(ENABLE);
-		} else {
-			fts_esdcheck_switch(DISABLE);
-		}
-#endif
 		break;
 	case PROC_READ_REGISTER:
 		writelen = 1;
@@ -193,18 +185,12 @@ static ssize_t fts_debug_read(struct file *filp, char __user *buff, size_t count
 		FTS_ERROR("apk proc read count(%d) fail", (int)count);
 		return -EINVAL;
 	}
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
 
 	switch (ts_data->proc_opmode) {
 	case PROC_READ_REGISTER:
 		readlen = 1;
 		ret = fts_i2c_read(client, NULL, 0, buf, readlen);
 		if (ret < 0) {
-#if FTS_ESDCHECK_EN
-			fts_esdcheck_proc_busy(0);
-#endif
 			FTS_ERROR("[APK]: read iic error!!");
 			return ret;
 		}
@@ -214,9 +200,6 @@ static ssize_t fts_debug_read(struct file *filp, char __user *buff, size_t count
 		readlen = count;
 		ret = fts_i2c_read(client, NULL, 0, buf, readlen);
 		if (ret < 0) {
-#if FTS_ESDCHECK_EN
-			fts_esdcheck_proc_busy(0);
-#endif
 			FTS_ERROR("[APK]: read iic error!!");
 			return ret;
 		}
@@ -229,9 +212,6 @@ static ssize_t fts_debug_read(struct file *filp, char __user *buff, size_t count
 		break;
 	}
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
 
 	if (copy_to_user(buff, buf, num_read_chars)) {
 		FTS_ERROR("[APK]: copy to user error!!");
@@ -246,167 +226,6 @@ static const struct file_operations fts_proc_fops = {
 	.read = fts_debug_read,
 	.write = fts_debug_write,
 };
-#else
-/* interface of write proc */
-/************************************************************************
-*   Name: fts_debug_write
-*  Brief:interface of write proc
-* Input: file point, data buf, data len, no use
-* Output: no
-* Return: data len
-***********************************************************************/
-static int fts_debug_write(struct file *filp, const char __user *buff, unsigned long len, void *data)
-{
-	int ret = 0;
-	u8 writebuf[PROC_WRITE_BUF_SIZE] = { 0 };
-	int buflen = len;
-	int writelen = 0;
-	char tmp[25];
-	struct fts_ts_data *ts_data = fts_data;
-	struct i2c_client *client = ts_data->client;
-
-	if ((count == 0) || (count > PROC_WRITE_BUF_SIZE)) {
-		FTS_ERROR("apk proc wirte count(%d) fail", (int)count);
-		return -EINVAL;
-	}
-
-	if (copy_from_user(&writebuf, buff, buflen)) {
-		FTS_ERROR("[APK]: copy from user error!!");
-		return -EFAULT;
-	}
-
-	ts_data->proc_opmode = writebuf[0];
-
-	switch (ts_data->proc_opmode) {
-	case PROC_SET_TEST_FLAG:
-		FTS_DEBUG("[APK]: PROC_SET_TEST_FLAG = %x!!", writebuf[1]);
-#if FTS_ESDCHECK_EN
-		if (writebuf[1] == 0) {
-			fts_esdcheck_switch(ENABLE);
-		} else {
-			fts_esdcheck_switch(DISABLE);
-		}
-#endif
-		break;
-	case PROC_READ_REGISTER:
-		writelen = 1;
-		ret = fts_i2c_write(client, writebuf + 1, writelen);
-		if (ret < 0) {
-			FTS_ERROR("[APK]: write iic error!!n");
-		}
-		break;
-	case PROC_WRITE_REGISTER:
-		writelen = 2;
-		ret = fts_i2c_write(client, writebuf + 1, writelen);
-		if (ret < 0) {
-			FTS_ERROR("[APK]: write iic error!!");
-		}
-		break;
-	case PROC_SET_SLAVE_ADDR:
-#if (FTS_CHIP_TYPE == _FT8201)
-		ret = client->addr;
-		FTS_DEBUG("Original i2c addr 0x%x ", ret << 1);
-		if (writebuf[1] != client->addr) {
-			client->addr = writebuf[1];
-			FTS_DEBUG("Change i2c addr 0x%x to 0x%x", ret << 1, writebuf[1] << 1);
-		}
-#endif
-		break;
-
-	case PROC_HW_RESET:
-		snprintf(tmp, PAGE_SIZE, "%s", writebuf + 1);
-		tmp[buflen - 1] = '\0';
-		if (strncmp(tmp, "focal_driver", 12) == 0) {
-			FTS_INFO("Begin HW Reset");
-			fts_reset_proc(1);
-		}
-		break;
-
-	case PROC_READ_DATA:
-	case PROC_WRITE_DATA:
-		writelen = len - 1;
-		if (writelen > 0) {
-			ret = fts_i2c_write(client, writebuf + 1, writelen);
-			if (ret < 0) {
-				FTS_ERROR("[APK]: write iic error!!");
-			}
-		}
-		break;
-	default:
-		break;
-	}
-
-	if (ret < 0) {
-		return ret;
-	} else {
-		return len;
-	}
-}
-
-/* interface of read proc */
-/************************************************************************
-*   Name: fts_debug_read
-*  Brief:interface of read proc
-* Input: point to the data, no use, no use, read len, no use, no use
-* Output: page point to data
-* Return: read char number
-***********************************************************************/
-static int fts_debug_read(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	int ret = 0;
-	u8 buf[PROC_READ_BUF_SIZE] = { 0 };
-	int num_read_chars = 0;
-	int readlen = 0;
-	struct fts_ts_data *ts_data = fts_data;
-	struct i2c_client *client = ts_data->client;
-
-	if ((count == 0) || (count > PROC_READ_BUF_SIZE)) {
-		FTS_ERROR("apk proc read count(%d) fail", (int)count);
-		return -EINVAL;
-	}
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
-	switch (ts_data->proc_opmode) {
-	case PROC_READ_REGISTER:
-		readlen = 1;
-		ret = fts_i2c_read(client, NULL, 0, buf, readlen);
-		if (ret < 0) {
-#if FTS_ESDCHECK_EN
-			fts_esdcheck_proc_busy(0);
-#endif
-			FTS_ERROR("[APK]: read iic error!!");
-			return ret;
-		}
-		num_read_chars = 1;
-		break;
-	case PROC_READ_DATA:
-		readlen = count;
-		ret = fts_i2c_read(client, NULL, 0, buf, readlen);
-		if (ret < 0) {
-#if FTS_ESDCHECK_EN
-			fts_esdcheck_proc_busy(0);
-#endif
-			FTS_ERROR("[APK]: read iic error!!");
-			return ret;
-		}
-
-		num_read_chars = readlen;
-		break;
-	case PROC_WRITE_DATA:
-		break;
-	default:
-		break;
-	}
-
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
-
-	memcpy(page, buf, num_read_chars);
-	return num_read_chars;
-}
-#endif
 
 /************************************************************************
 * Name: fts_create_apk_debug_channel
@@ -417,21 +236,12 @@ static int fts_debug_read(char *page, char **start, off_t off, int count, int *e
 ***********************************************************************/
 int fts_create_apk_debug_channel(struct fts_ts_data *ts_data)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 	ts_data->proc = proc_create(PROC_NAME, 0644, NULL, &fts_proc_fops);
-#else
-	ts_data->proc = create_proc_entry(PROC_NAME, 0644, NULL);
-#endif
 	if (NULL == ts_data->proc) {
 		FTS_ERROR("create proc entry fail");
 		return -ENOMEM;
 	} else {
 		FTS_INFO("Create proc entry success!");
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
-		ts_data->proc->write_proc = fts_debug_write;
-		ts_data->proc->read_proc = fts_debug_read;
-#endif
 	}
 
 	return 0;
@@ -448,11 +258,7 @@ void fts_release_apk_debug_channel(struct fts_ts_data *ts_data)
 {
 
 	if (ts_data->proc) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 		proc_remove(ts_data->proc);
-#else
-		remove_proc_entry(PROC_NAME, NULL);
-#endif
 	}
 }
 
@@ -518,15 +324,9 @@ static ssize_t fts_tpfwver_show(struct device *dev, struct device_attribute *att
 
 	mutex_lock(&input_dev->mutex);
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
 	if (fts_i2c_read_reg(client, FTS_REG_FW_VER, &fwver) < 0) {
 		num_read_chars = snprintf(buf, PAGE_SIZE, "I2c transfer error!\n");
 	}
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
 	if ((fwver == 0xFF) || (fwver == 0x00))
 		num_read_chars = snprintf(buf, PAGE_SIZE, "get tp fw version fail!\n");
 	else
@@ -740,9 +540,6 @@ static ssize_t fts_tprwreg_store(struct device *dev, struct device_attribute *at
 		rw_op.len = fts_parse_buf(buf, cmd_length);
 	}
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
 	if (rw_op.len < 0) {
 		FTS_ERROR("cmd buffer error!");
 
@@ -786,9 +583,6 @@ static ssize_t fts_tprwreg_store(struct device *dev, struct device_attribute *at
 		}
 	}
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
 	mutex_unlock(&input_dev->mutex);
 
 	return count;
@@ -821,15 +615,9 @@ static ssize_t fts_fwupgradebin_store(struct device *dev, struct device_attribut
 	mutex_lock(&input_dev->mutex);
 	ts_data->fw_loading = 1;
 	fts_irq_disable();
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_switch(DISABLE);
-#endif
 
 	fts_upgrade_bin(client, fwname, 0);
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_switch(ENABLE);
-#endif
 	fts_irq_enable();
 	ts_data->fw_loading = 0;
 	mutex_unlock(&input_dev->mutex);
@@ -864,15 +652,9 @@ static ssize_t fts_fwforceupg_store(struct device *dev, struct device_attribute 
 	mutex_lock(&input_dev->mutex);
 	ts_data->fw_loading = 1;
 	fts_irq_disable();
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_switch(DISABLE);
-#endif
 
 	fts_upgrade_bin(client, fwname, 1);
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_switch(ENABLE);
-#endif
 	fts_irq_enable();
 	ts_data->fw_loading = 0;
 	mutex_unlock(&input_dev->mutex);
@@ -916,9 +698,6 @@ static ssize_t fts_dumpreg_show(struct device *dev, struct device_attribute *att
 	struct input_dev *input_dev = fts_data->input_dev;
 
 	mutex_lock(&input_dev->mutex);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(1);
-#endif
 	fts_i2c_read_reg(client, FTS_REG_POWER_MODE, &val);
 	count += snprintf(buf + count, PAGE_SIZE, "Power Mode:0x%02x\n", val);
 
@@ -948,12 +727,6 @@ static ssize_t fts_dumpreg_show(struct device *dev, struct device_attribute *att
 
 	fts_i2c_read_reg(client, FTS_REG_INT_CNT, &val);
 	count += snprintf(buf + count, PAGE_SIZE, "INT count:0x%02x\n", val);
-
-	fts_i2c_read_reg(client, FTS_REG_FLOW_WORK_CNT, &val);
-	count += snprintf(buf + count, PAGE_SIZE, "ESD count:0x%02x\n", val);
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_proc_busy(0);
-#endif
 
 	mutex_unlock(&input_dev->mutex);
 	return count;

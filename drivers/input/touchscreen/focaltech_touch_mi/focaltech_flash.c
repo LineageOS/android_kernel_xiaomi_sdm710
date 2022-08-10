@@ -1081,13 +1081,6 @@ int fts_upgrade_bin(struct i2c_client *client, char *fw_name, bool force)
 			goto err_bin;
 		}
 	} else {
-#if FTS_AUTO_LIC_UPGRADE_EN
-		if (upg->func->lic_upgrade) {
-			ret = upg->func->lic_upgrade(client, fw_file_buf, fw_file_len);
-		} else {
-			FTS_INFO("lic_upgrade function is null, no upgrade");
-		}
-#endif
 		if (upg->func->upgrade) {
 			ret = upg->func->upgrade(client, fw_file_buf, fw_file_len);
 		} else {
@@ -1110,193 +1103,6 @@ err_bin:
 	}
 	return ret;
 }
-
-#if FTS_AUTO_LIC_UPGRADE_EN
-static int fts_lic_get_vid_in_tp(struct i2c_client *client, u16 *vid)
-{
-	int ret = 0;
-	u8 val[2] = { 0 };
-
-	if (NULL == vid) {
-		FTS_ERROR("vid is NULL");
-		return -EINVAL;
-	}
-
-	ret = fts_i2c_read_reg(client, FTS_REG_VENDOR_ID, &val[0]);
-	if (fts_data->ic_info.is_incell)
-		ret = fts_i2c_read_reg(client, FTS_REG_MODULE_ID, &val[1]);
-	if (ret < 0) {
-		FTS_ERROR("read vid from tp fail");
-		return ret;
-	}
-
-	*vid = *(u16 *) val;
-	return 0;
-}
-
-static int fts_lic_get_vid_in_host(u16 *vid)
-{
-	u8 val[2] = { 0 };
-	u8 *licbuf = NULL;
-	u32 conf_saddr = 0;
-	struct fts_upgrade *upg = fwupgrade;
-
-	if (!upg || !upg->func || !upg->lic || !vid) {
-		FTS_ERROR("upgrade/func/get_hlic_ver/lic/vid is null");
-		return -EINVAL;
-	}
-
-	if (upg->lic_length < FTS_MAX_LEN_SECTOR) {
-		FTS_ERROR("lic length(%x) fail", upg->lic_length);
-		return -EINVAL;
-	}
-
-	licbuf = upg->lic;
-	conf_saddr = upg->func->fwcfgoff;
-	val[0] = licbuf[conf_saddr + FTS_CONIFG_VENDORID_OFF];
-	if (fts_data->ic_info.is_incell)
-		val[1] = licbuf[conf_saddr + FTS_CONIFG_MODULEID_OFF];
-
-	*vid = *(u16 *) val;
-	return 0;
-}
-
-static int fts_lic_get_ver_in_tp(struct i2c_client *client, u8 *ver)
-{
-	int ret = 0;
-
-	if (NULL == ver) {
-		FTS_ERROR("ver is NULL");
-		return -EINVAL;
-	}
-
-	ret = fts_i2c_read_reg(client, FTS_REG_LIC_VER, ver);
-	if (ret < 0) {
-		FTS_ERROR("read lcd initcode ver from tp fail");
-		return ret;
-	}
-
-	return 0;
-}
-
-static int fts_lic_get_ver_in_host(u8 *ver)
-{
-	int ret = 0;
-	struct fts_upgrade *upg = fwupgrade;
-
-	if (!upg || !upg->func || !upg->func->get_hlic_ver || !upg->lic) {
-		FTS_ERROR("upgrade/func/get_hlic_ver/lic is null");
-		return -EINVAL;
-	}
-
-	ret = upg->func->get_hlic_ver(upg->lic);
-	if (ret < 0) {
-		FTS_ERROR("get host lcd initial code version fail");
-		return ret;
-	}
-
-	*ver = (u8) ret;
-	return ret;
-}
-
-/* check if lcd init code need upgrade
-* true-need  false-no need
-*/
-static bool fts_lic_need_upgrade(struct i2c_client *client)
-{
-	int ret = 0;
-	u8 initcode_ver_in_tp = 0;
-	u8 initcode_ver_in_host = 0;
-	u16 vid_in_tp = 0;
-	u16 vid_in_host = 0;
-	bool fwvalid = false;
-
-	fwvalid = fts_fwupg_check_fw_valid(client);
-	if (!fwvalid) {
-		FTS_INFO("fw is invalid, no upgrade lcd init code");
-		return false;
-	}
-
-	ret = fts_lic_get_vid_in_host(&vid_in_host);
-	if (ret < 0) {
-		FTS_ERROR("vendor id in host invalid");
-		return false;
-	}
-
-	ret = fts_lic_get_vid_in_tp(client, &vid_in_tp);
-	if (ret < 0) {
-		FTS_ERROR("vendor id in tp invalid");
-		return false;
-	}
-
-	FTS_DEBUG("vid in tp:%x, host:%x", vid_in_tp, vid_in_host);
-	if (vid_in_tp != vid_in_host) {
-		FTS_INFO("vendor id in tp&host are different, no upgrade lic");
-		return false;
-	}
-
-	ret = fts_lic_get_ver_in_host(&initcode_ver_in_host);
-	if (ret < 0) {
-		FTS_ERROR("init code in host invalid");
-		return false;
-	}
-
-	ret = fts_lic_get_ver_in_tp(client, &initcode_ver_in_tp);
-	if (ret < 0) {
-		FTS_ERROR("read reg0xE4 fail");
-		return false;
-	}
-
-	FTS_DEBUG("lcd initial code version in tp:%x, host:%x", initcode_ver_in_tp, initcode_ver_in_host);
-	if (0xA5 == initcode_ver_in_tp) {
-		FTS_INFO("lcd init code ver is 0xA5, don't upgade init code");
-		return false;
-	} else if (0xFF == initcode_ver_in_tp) {
-		FTS_DEBUG("lcd init code in tp is invalid, need upgrade init code");
-		return true;
-	} else if (initcode_ver_in_tp < initcode_ver_in_host)
-		return true;
-	else
-		return false;
-}
-
-int fts_lic_upgrade(struct i2c_client *client, struct fts_upgrade *upg)
-{
-	int ret = 0;
-	bool hlic_upgrade = false;
-	int upgrade_count = 0;
-	u8 ver = 0;
-
-	FTS_INFO("lcd initial code auto upgrade function");
-	if ((!upg) || (!upg->func) || (!upg->func->lic_upgrade)) {
-		FTS_ERROR("lcd upgrade function is null");
-		return -EINVAL;
-	}
-
-	hlic_upgrade = fts_lic_need_upgrade(client);
-	FTS_INFO("lcd init code upgrade flag:%d", hlic_upgrade);
-	if (hlic_upgrade) {
-		FTS_INFO("lcd initial code need upgrade, upgrade begin...");
-		do {
-			FTS_INFO("lcd initial code upgrade times:%d", upgrade_count);
-			upgrade_count++;
-
-			ret = upg->func->lic_upgrade(client, upg->lic, upg->lic_length);
-			if (ret < 0) {
-				fts_fwupg_reset_in_boot(client);
-			} else {
-				fts_lic_get_ver_in_tp(client, &ver);
-				FTS_INFO("success upgrade to lcd initcode ver:%02x", ver);
-				break;
-			}
-		} while (upgrade_count < 2);
-	} else {
-		FTS_INFO("lcd initial code don't need upgrade");
-	}
-
-	return ret;
-}
-#endif /* FTS_AUTO_LIC_UPGRADE_EN */
 
 static int fts_param_get_ver_in_tp(struct i2c_client *client, u8 *ver)
 {
@@ -1579,14 +1385,6 @@ void fts_fwupg_auto_upgrade(struct fts_ts_data *ts_data)
 	else
 		FTS_INFO("**********tp fw(app/param) no upgrade/upgrade success**********");
 
-#if FTS_AUTO_LIC_UPGRADE_EN
-	ret = fts_lic_upgrade(client, upg);
-	if (ret < 0)
-		FTS_ERROR("**********lcd init code upgrade failed**********");
-	else
-		FTS_INFO("**********lcd init code no upgrade/upgrade success**********");
-#endif
-
 	FTS_INFO("********************FTS exit upgrade********************");
 }
 
@@ -1722,9 +1520,6 @@ static void fts_fwupg_work(struct work_struct *work)
 	FTS_INFO("fw upgrade work function");
 	ts_data->fw_loading = 1;
 	fts_irq_disable();
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_switch(DISABLE);
-#endif
 
 	FTS_INFO("get upgrade fw file");
 	ret = fts_fwupg_get_fw_file(ts_data);
@@ -1736,9 +1531,6 @@ static void fts_fwupg_work(struct work_struct *work)
 		fts_fwupg_auto_upgrade(ts_data);
 	}
 
-#if FTS_ESDCHECK_EN
-	fts_esdcheck_switch(ENABLE);
-#endif
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	fts_fod_recovery(ts_data->client);
 #endif
