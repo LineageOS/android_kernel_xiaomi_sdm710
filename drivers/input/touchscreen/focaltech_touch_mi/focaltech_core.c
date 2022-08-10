@@ -67,22 +67,6 @@ static int fts_ts_resume(struct device *dev);
 static void fts_resume_work(struct work_struct *work);
 static void fts_suspend_work(struct work_struct *work);
 static int fts_read_and_report_foddata(struct fts_ts_data *data);
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-static bool system_i2c_suspended;
-module_param_named(system_i2c_suspended, system_i2c_suspended, bool, 0664);
-static DEFINE_SPINLOCK(i2c_resume_lock);
-
-void i2c_status_for_touch(bool on)
-{
-	FTS_FUNC_ENTER();
-	spin_lock(&i2c_resume_lock);
-	system_i2c_suspended = !!on;
-	spin_unlock(&i2c_resume_lock);
-	FTS_FUNC_EXIT();
-	return;
-}
-EXPORT_SYMBOL(i2c_status_for_touch);
-#endif
 
 struct device *fts_get_dev(void)
 {
@@ -966,27 +950,18 @@ static irqreturn_t fts_ts_interrupt(int irq, void *data)
 		FTS_ERROR("[INTR]: Invalid fts_ts_data");
 		return IRQ_HANDLED;
 	}
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	pm_wakeup_event(&ts_data->client->dev, MAX_WAIT_TIME);
-	if (!ts_data->IRQ_skipped && spin_trylock(&i2c_resume_lock)) {
-		if (system_i2c_suspended) {
-			FTS_ERROR("System i2c resume didn't complete, skip this IRQ\n");
-			ts_data->IRQ_skipped = true;
-			spin_unlock(&i2c_resume_lock);
-			FTS_ERROR("System i2c resume didn't complete, queuework\n");
-			flush_workqueue(ts_data->ts_wait_i2c_wq);
-			queue_work(fts_data->ts_wait_i2c_wq, &fts_data->read_touch_data_work);
+
+#ifdef CONFIG_PM
+	if (ts_data->dev_pm_suspend) {
+		unsigned long timeout = msecs_to_jiffies(FTS_RESUME_TIMEOUT);
+
+		ret = wait_for_completion_timeout(&ts_data->pm_completion,
+						 timeout);
+		if (!ret) {
+			FTS_ERROR("I2C bus resume timeout, skipping IRQ");
 			return IRQ_HANDLED;
-		} else {
-			spin_unlock(&i2c_resume_lock);
-			ts_data->IRQ_skipped = false;
-			goto handleIRQ;
 		}
-	} else {
-		FTS_ERROR("Failed to get i2c resume spin lock or IRQ has skipped\n");
-		return IRQ_HANDLED;
 	}
-handleIRQ:
 #endif
 	ret = fts_read_touchdata(ts_data);
 	if (ret == 0) {
@@ -1182,46 +1157,6 @@ err_irq_gpio_req:
 	FTS_FUNC_EXIT();
 	return ret;
 }
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-static void fts_try_readdata_func(struct work_struct *work)
-{
-	u8 reg_value;
-	int ret = 0;
-	int retry = 20;
-	struct fts_ts_data *ts_data = container_of(work, struct fts_ts_data, read_touch_data_work);
-	FTS_FUNC_ENTER();
-	while (ts_data->IRQ_skipped && retry) {
-		if (!system_i2c_suspended) {
-			msleep(10);
-			FTS_INFO("%s Delay 20ms and read fod data\n", __func__);
-			break;
-		} else {
-			FTS_INFO("%s System i2c still suspend\n", __func__);
-			retry--;
-			msleep(5);
-			continue;
-		}
-	}
-	if (retry <= 0) {
-		FTS_ERROR("%s retry 20 times and read FODdata failed\n", __func__);
-		ts_data->IRQ_skipped = false;
-		return;
-	}
-	if (fts_read_and_report_foddata(ts_data) == 0) {
-		ts_data->IRQ_skipped = false;
-		FTS_INFO("%s Try ReadFODData from IC Success\n", __func__);
-		ret = fts_i2c_read_reg(fts_data->client, FTS_REG_INT_ACK, &reg_value);
-		if (ret < 0)
-			FTS_ERROR("%s read ack error\n", __func__);
-	} else {
-		ts_data->IRQ_skipped = false;
-		FTS_ERROR("%s Try ReadFODData failed\n", __func__);
-	}
-
-	FTS_FUNC_EXIT();
-	return;
-}
-#endif
 
 /*****************************************************************************
 *  Name: fts_get_dt_coords
@@ -1609,10 +1544,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	}
 
 	fts_data = ts_data;
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	system_i2c_suspended = false;
-	ts_data->IRQ_skipped = false;
-#endif
 	ts_data->client = client;
 	ts_data->pdata = pdata;
 	i2c_set_clientdata(client, ts_data);
@@ -1694,28 +1625,12 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err_sysfs_create_group;
 	}
 
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	/*
-	 *create workqueue thread for trying to read touch data
-	 */
-	ts_data->ts_wait_i2c_wq =  alloc_workqueue("fts_wait_i2c_wq",
-			    WQ_UNBOUND | WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
-	if (!ts_data->ts_wait_i2c_wq) {
-		FTS_ERROR("failed to create fts wait i2c workqueue thread\n");
-		goto err_sysfs_create_group;
-	}
-	INIT_WORK(&ts_data->read_touch_data_work, fts_try_readdata_func);
-#endif
 	ts_data->event_wq =
 	    alloc_workqueue("fts-event-queue",
 			    WQ_UNBOUND | WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
 	if (!ts_data->event_wq) {
 		FTS_ERROR("Cannot create work thread\n");
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-		goto err_wait_i2c_wq;
-#else
 		goto err_sysfs_create_group;
-#endif
 	}
 
 	INIT_WORK(&ts_data->resume_work, fts_resume_work);
@@ -1729,7 +1644,10 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err_event_wq;
 	}
 	device_init_wakeup(&client->dev, 1);
+#ifdef CONFIG_PM
 	ts_data->dev_pm_suspend = false;
+	init_completion(&ts_data->pm_completion);
+#endif
 
 #if  defined(CONFIG_DRM)
 	ts_data->fb_notif.notifier_call = fb_notifier_callback;
@@ -1775,11 +1693,6 @@ err_class_create:
 err_event_wq:
 	if (ts_data->event_wq)
 		destroy_workqueue(ts_data->event_wq);
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-err_wait_i2c_wq:
-	if (ts_data->ts_wait_i2c_wq)
-		destroy_workqueue(ts_data->ts_wait_i2c_wq);
-#endif
 err_sysfs_create_group:
 	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
 err_irq_req:
@@ -1825,9 +1738,6 @@ static int fts_ts_remove(struct i2c_client *client)
 
 	fts_remove_sysfs(client);
 	destroy_workqueue(ts_data->event_wq);
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	destroy_workqueue(ts_data->ts_wait_i2c_wq);
-#endif
 	fts_ex_mode_exit(client);
 	fts_fwupg_exit(ts_data);
 
@@ -1980,9 +1890,7 @@ static int fts_ts_resume(struct device *dev)
 		fts_data->finger_in_fod = false;
 		fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_NO_CAL, true);
 	}
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	ts_data->IRQ_skipped = false;
-#endif
+
 	fts_tp_state_recovery(ts_data->client);
 
 	if (fts_gesture_resume(ts_data->client) == 0) {
@@ -1997,11 +1905,14 @@ static int fts_ts_resume(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 static int fts_pm_suspend(struct device *dev)
 {
 	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 	int ret = 0;
+
 	ts_data->dev_pm_suspend = true;
+	reinit_completion(&ts_data->pm_completion);
 
 	ret = enable_irq_wake(ts_data->irq);
 	if (ret)
@@ -2016,6 +1927,7 @@ static int fts_pm_resume(struct device *dev)
 	int ret = 0;
 
 	ts_data->dev_pm_suspend = false;
+	complete(&ts_data->pm_completion);
 
 	ret = disable_irq_wake(ts_data->irq);
 	if (ret)
@@ -2028,6 +1940,7 @@ static const struct dev_pm_ops fts_dev_pm_ops = {
 	.suspend = fts_pm_suspend,
 	.resume = fts_pm_resume,
 };
+#endif
 
 static void fts_resume_work(struct work_struct *work)
 {

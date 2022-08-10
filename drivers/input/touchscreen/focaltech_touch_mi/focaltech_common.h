@@ -91,9 +91,7 @@
 #define FTS_REG_INT_ACK                     0x3E
 
 #define BTN_INFO                            0x155
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-#define MAX_WAIT_TIME                  200
-#endif
+
 #define FTS_SYSFS_ECHO_ON(buf)      (buf[0] == '1')
 #define FTS_SYSFS_ECHO_OFF(buf)     (buf[0] == '0')
 

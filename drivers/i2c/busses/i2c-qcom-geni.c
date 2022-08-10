@@ -81,10 +81,6 @@
 
 #define I2C_TIMEOUT_MIN_USEC	500000
 
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-extern void i2c_status_for_touch(bool on);
-#endif
-
 enum i2c_se_mode {
 	UNINITIALIZED,
 	FIFO_SE_DMA,
@@ -956,20 +952,6 @@ static int geni_i2c_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-static int geni_i2c_suspend(struct device *device)
-{
-	i2c_status_for_touch(true);
-	return 0;
-}
-
-static int geni_i2c_resume(struct device *device)
-{
-	i2c_status_for_touch(false);
-	return 0;
-}
-#endif
-
 static int geni_i2c_resume_noirq(struct device *device)
 {
 	return 0;
@@ -1088,10 +1070,6 @@ static int geni_i2c_suspend_noirq(struct device *device)
 #endif
 
 static const struct dev_pm_ops geni_i2c_pm_ops = {
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	.suspend = geni_i2c_suspend,
-	.resume = geni_i2c_resume,
-#endif
 	.suspend_noirq		= geni_i2c_suspend_noirq,
 	.resume_noirq		= geni_i2c_resume_noirq,
 	.runtime_suspend	= geni_i2c_runtime_suspend,

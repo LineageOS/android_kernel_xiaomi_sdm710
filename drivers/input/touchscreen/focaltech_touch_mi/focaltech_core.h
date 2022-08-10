@@ -102,6 +102,10 @@
 
 #define FTS_LOCKDOWN_INFO_SIZE				8
 
+#ifdef CONFIG_PM
+#define FTS_RESUME_TIMEOUT		100 /* ms */
+#endif
+
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef
 *****************************************************************************/
@@ -144,14 +148,6 @@ struct fts_ts_data {
 	struct work_struct fwupg_work;
 	struct delayed_work esdcheck_work;
 	struct delayed_work prc_work;
-#ifdef CONFIG_I2C_STATUS_FOR_TOUCH
-	/*
-	 *before system i2c ready, read data from touch IC
-	 */
-	struct workqueue_struct *ts_wait_i2c_wq;
-	struct work_struct read_touch_data_work;
-	bool IRQ_skipped;
-#endif
 	struct regulator *vsp;
 	struct regulator *vsn;
 	struct regulator *vddio;
@@ -183,7 +179,10 @@ struct fts_ts_data {
 	struct proc_dir_entry *proc;
 	u8 proc_opmode;
 	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];
+#ifdef CONFIG_PM
 	bool dev_pm_suspend;
+	struct completion pm_completion;
+#endif
 	bool lpwg_mode;
 	bool fw_forceupdate;
 	struct work_struct suspend_work;
