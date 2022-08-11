@@ -1249,9 +1249,6 @@ static int fts_get_dt_coords(struct device *dev, char *name, struct fts_ts_platf
 		FTS_ERROR("invalid:%s, size:%d", name, coords_size);
 		return -EINVAL;
 	}
-	ret = of_property_read_u32(np, "focaltech,lockdown-info-addr", &pdata->lockdown_info_addr);
-	if (!ret)
-		FTS_ERROR("Unable to get lockdown-info-addr");
 
 	ret = of_property_read_u32_array(np, name, coords, coords_size);
 	if (ret && (ret != -EINVAL)) {
@@ -1353,6 +1350,13 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
 		FTS_ERROR("selftest open min undefined!");
 
 	pdata->reset_when_resume = of_property_read_bool(np, "focaltech,reset-when-resume");
+
+	ret = of_property_read_u32(np, "focaltech,lockdown-info-addr",
+				   &temp_val);
+	if (ret == 0)
+		pdata->lockdown_info_addr = temp_val;
+	else
+		FTS_ERROR("Unable to get lockdown-info-addr");
 
 	FTS_FUNC_EXIT();
 	return 0;
