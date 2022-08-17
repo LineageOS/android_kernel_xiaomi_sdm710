@@ -1434,17 +1434,21 @@ static ssize_t gtp_fod_test_store(struct device *dev,
 	return count;
 }
 
-static ssize_t gtp_fod_status_show(struct device *dev,
-				   struct device_attribute *attr, char *buf)
+static DEVICE_ATTR(fod_test, (S_IRUGO | S_IWUSR | S_IWGRP),
+		NULL, gtp_fod_test_store);
+
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+static ssize_t fod_status_show(struct kobject *kobj,
+                               struct kobj_attribute *attr, char *buf)
 {
 	struct goodix_ts_core *core_data = dev_get_drvdata(dev);
 
-	return snprintf(buf, 10, "%d\n", core_data->fod_status);
+	return sprintf(buf, "%d\n", core_data->fod_status);
 }
 
-static ssize_t gtp_fod_status_store(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf, size_t count)
+static ssize_t fod_status_store(struct kobject *kobj,
+                                struct kobj_attribute *attr, const char *buf,
+                                size_t count)
 {
 	struct goodix_ts_core *core_data = dev_get_drvdata(dev);
 
@@ -1457,11 +1461,11 @@ static ssize_t gtp_fod_status_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(fod_test, (S_IRUGO | S_IWUSR | S_IWGRP),
-		NULL, gtp_fod_test_store);
-
-static DEVICE_ATTR(fod_status, (S_IRUGO | S_IWUSR | S_IWGRP),
-		   gtp_fod_status_show, gtp_fod_status_store);
+static struct tp_common_ops fod_status_ops = {
+	.show = fod_status_show,
+	.store = fod_status_store,
+};
+#endif
 
 static void goodix_switch_mode_work(struct work_struct *work)
 {
@@ -2566,6 +2570,11 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	if (r < 0) {
 		ts_err("Failed to create double_tap node err=%d\n", r);
 	}
+
+	r = tp_common_set_fod_status_ops(&fod_status_ops);
+	if (r < 0) {
+		ts_err("Failed to create fod_status node err=%d\n", r);
+	}
 #endif
 
 	r = ts_device->hw_ops->reset(ts_device);
@@ -2640,12 +2649,6 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	if (sysfs_create_file(&core_data->gtp_touch_dev->kobj,
 				  &dev_attr_fod_test.attr)) {
 		ts_err("Failed to create fod_test sysfs group!");
-		goto out;
-	}
-
-	if (sysfs_create_file(&core_data->gtp_touch_dev->kobj,
-			      &dev_attr_fod_status.attr)) {
-		ts_err("Failed to create fod_status sysfs group!\n");
 		goto out;
 	}
 
