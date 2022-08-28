@@ -177,7 +177,6 @@ struct fts_ts_data {
 	  *when finger down in fod area, sometime finger id will change.
 	  *so we need to release the old id point to avoid ghost point.
 	  */
-	u8 old_point_id;
 	int pnt_buf_size;
 	int touchs;
 	bool key_down;
@@ -220,7 +219,6 @@ struct fts_ts_data {
 	bool fod_finger_skip;
 	int overlap_area;
 	struct mutex fod_mutex;
-	bool point_id_changed;
 #endif
 	struct class *fts_tp_class;
 	struct device *fts_touch_dev;
