@@ -1827,13 +1827,19 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 
 		if (*blank == MSM_DRM_BLANK_UNBLANK) {
 			FTS_INFO("FTS do resume work\n");
+			fts_data->aod_status = 0;
 			queue_work(fts_data->event_wq, &fts_data->resume_work);
 		} else if (*blank == MSM_DRM_BLANK_POWERDOWN || *blank == MSM_DRM_BLANK_LP1 || *blank == MSM_DRM_BLANK_LP2) {
 			FTS_INFO("FTS do suspend work by event %s\n", *blank == MSM_DRM_BLANK_POWERDOWN ? "POWER DOWN" : "LP");
-			if (*blank == MSM_DRM_BLANK_POWERDOWN && fts_data->finger_in_fod) {
-				FTS_INFO("set fod finger skip\n");
-				fts_data->fod_finger_skip = true;
+			if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+				if (fts_data->finger_in_fod) {
+					FTS_INFO("set fod finger skip\n");
+					fts_data->fod_finger_skip = true;
+				}
+			} else {
+				fts_data->aod_status = 1;
 			}
+
 			queue_work(fts_data->event_wq, &fts_data->suspend_work);
 		}
 	}
