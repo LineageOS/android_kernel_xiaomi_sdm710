@@ -4,6 +4,4 @@
 
 # Each configuration option enables a list of files.
 
-
-obj-$(CONFIG_TOUCHSCREEN_FTS_MI) += focaltech_upgrade_ft8719.o
-obj-$(CONFIG_TOUCHSCREEN_FTS_MI) += focaltech_upgrade_ft5452.o
+focaltech_fts_mi-y += focaltech_upgrade_ft8719.o focaltech_upgrade_ft5452.o
