@@ -16,6 +16,23 @@
       "message": "Looks fine to me!",
       "revId": "5de85753db554e1309504b993eff23588b2aae1b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "67584275_7f5a8c9f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-09-08T07:41:58Z",
+      "side": 1,
+      "message": "Verified on successfully on Pyxis",
+      "revId": "5de85753db554e1309504b993eff23588b2aae1b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
