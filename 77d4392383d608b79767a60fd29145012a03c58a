@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "98d4cf19_e6a339ea",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27772
+      },
+      "writtenOn": "2022-09-08T07:42:47Z",
+      "side": 1,
+      "message": "Looks fine to me.\nTested on sirius. Works flawlessly ",
+      "revId": "77d4392383d608b79767a60fd29145012a03c58a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
