@@ -911,13 +911,8 @@ static int __dsi_panel_send(struct dsi_panel *panel, enum dsi_cmd_set_type type,
 static int dsi_panel_set_hbm(struct dsi_panel *panel, bool enabled)
 {
 	return enabled ?
-#ifdef CONFIG_MACH_XIAOMI_SIRIUS
 		DSI_PANEL_SEND(panel, DISP_HBM_ON) :
 		DSI_PANEL_SEND(panel, DISP_HBM_OFF);
-#else
-		DSI_PANEL_SEND(panel, DISP_HBM_FOD_ON) :
-		DSI_PANEL_SEND(panel, DISP_HBM_FOD_OFF);
-#endif
 }
 
 static u32 dsi_panel_get_backlight(struct dsi_panel *panel)
@@ -1851,8 +1846,6 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command",
 	"qcom,mdss-dsi-post-mode-switch-on-command",
-	"qcom,mdss-dsi-dispparam-hbm-fod-on-command",
-	"qcom,mdss-dsi-dispparam-hbm-fod-off-command",
 	"qcom,mdss-dsi-dispparam-hbm-on-command",
 	"qcom,mdss-dsi-dispparam-hbm-off-command",
 };
@@ -1879,8 +1872,6 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command-state",
 	"qcom,mdss-dsi-post-mode-switch-on-command-state",
-	"qcom,mdss-dsi-dispparam-hbm-fod-on-command-state",
-	"qcom,mdss-dsi-dispparam-hbm-fod-off-command-state",
 	"qcom,mdss-dsi-dispparam-hbm-on-command-state",
 	"qcom,mdss-dsi-dispparam-hbm-off-command-state",
 };
