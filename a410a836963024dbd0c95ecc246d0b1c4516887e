@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ec459927_67fb1b92",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-09-09T08:33:59Z",
+      "side": 1,
+      "message": "Good follow-up. I have also an idea about it but don\u0027t want to be too invasive (deleting old commands that we could use in future somehow).\nBut as you came with the same idea then go and let\u0027s do it.",
+      "revId": "a410a836963024dbd0c95ecc246d0b1c4516887e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
