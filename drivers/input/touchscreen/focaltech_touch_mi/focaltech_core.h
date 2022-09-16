@@ -214,7 +214,6 @@ struct fts_ts_data {
 	struct work_struct power_supply_work;
 	int is_usb_exist;
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
-	int fod_status;
 	bool finger_in_fod;
 	bool fod_finger_skip;
 	int fod_x;

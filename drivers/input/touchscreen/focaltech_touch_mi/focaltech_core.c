@@ -908,8 +908,8 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 					mutex_unlock(&data->report_mutex);
 					return -EINVAL;
 				}
-				if (!data->fod_status) {
-					FTS_INFO("Panel off but fod_status is false, do not report touch down event\n");
+				if (!data->aod_status) {
+					FTS_INFO("Panel is suspended but not in AOD mode, do not report touch down event\n");
 					mutex_unlock(&data->report_mutex);
 					return 0;
 				}
@@ -1922,33 +1922,6 @@ static int check_is_focal_touch(struct fts_ts_data *ts_data)
 	return true;
 }
 
-static ssize_t fod_status_show(struct kobject *kobj,
-                               struct kobj_attribute *attr, char *buf)
-{
-	if (!fts_data)
-		return -EINVAL;
-
-	return sprintf(buf, "%d\n", fts_data->fod_status);
-}
-
-static ssize_t fod_status_store(struct kobject *kobj,
-                                struct kobj_attribute *attr, const char *buf,
-                                size_t count)
-{
-	int val;
-
-	if (!fts_data || kstrtoint(buf, 10, &val))
-		return -EINVAL;
-
-	fts_data->fod_status = !!val;
-	return count;
-}
-
-static struct tp_common_ops fod_status_ops = {
-	.show = fod_status_show,
-	.store = fod_status_store,
-};
-
 static ssize_t fp_state_show(struct kobject *kobj, struct kobj_attribute *attr,
 			     char *buf)
 {
@@ -2025,7 +1998,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	mutex_init(&ts_data->report_mutex);
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	mutex_init(&ts_data->fod_mutex);
-	ts_data->fod_status = 0;
 #endif
 
 	ret = fts_input_init(ts_data);
@@ -2203,11 +2175,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	ts_data->power_supply_notifier.notifier_call = fts_power_supply_event;
 	power_supply_reg_notifier(&ts_data->power_supply_notifier);
 
-	ret = tp_common_set_fod_status_ops(&fod_status_ops);
-	if (ret < 0) {
-		FTS_ERROR("%s: Failed to create fod_status node err=%d\n",
-			  __func__, ret);
-	}
 	ret = tp_common_set_fp_state_ops(&fp_state_ops);
 	if (ret < 0) {
 		FTS_ERROR("%s: Failed to create fp_state node err=%d\n",
