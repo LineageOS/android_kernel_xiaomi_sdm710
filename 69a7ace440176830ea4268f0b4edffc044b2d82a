@@ -63,6 +63,24 @@
       "message": "Alex, could you please verify it on Sirius?",
       "revId": "69a7ace440176830ea4268f0b4edffc044b2d82a",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "78523864_059a9bef",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27772
+      },
+      "writtenOn": "2022-09-18T12:28:08Z",
+      "side": 1,
+      "message": "Issue still exists on Sirius",
+      "parentUuid": "69d47333_7ed52594",
+      "revId": "69a7ace440176830ea4268f0b4edffc044b2d82a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
