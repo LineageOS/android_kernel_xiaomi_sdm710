@@ -1160,16 +1160,15 @@ static ssize_t double_tap_store(struct kobject *kobj,
 
 	rc = kstrtoint(buf, 10, &val);
 	if (rc)
-	return -EINVAL;
+		return -EINVAL;
 
-	ms = (struct fts_mode_switch *)kmalloc(sizeof(struct fts_mode_switch), GFP_ATOMIC);
-	if (ms == NULL)
-	return -EINVAL;
+	ms = kmalloc(sizeof(struct fts_mode_switch), GFP_KERNEL);
+	if (!ms)
+		return -EINVAL;
 
 	ms->info = fts_info;
-	ms->mode = (unsigned char)!!val;
-	INIT_WORK(&ms->switch_mode_work,
-			fts_switch_mode_work);
+	ms->mode = val ? INPUT_EVENT_WAKUP_MODE_ON : INPUT_EVENT_WAKUP_MODE_OFF;
+	INIT_WORK(&ms->switch_mode_work, fts_switch_mode_work);
 	schedule_work(&ms->switch_mode_work);
 
 	return count;
