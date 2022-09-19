@@ -2036,11 +2036,13 @@ int goodix_ts_fb_notifier_callback(struct notifier_block *self,
 				return 0;
 			ts_info("suspend by %s", blank == MSM_DRM_BLANK_POWERDOWN ? "blank" :
 			"doze");
+			core_data->aod_status = 1;
 			queue_work(core_data->event_wq, &core_data->suspend_work);
 		} else if (event == MSM_DRM_EVENT_BLANK && blank == MSM_DRM_BLANK_UNBLANK) {
 			if (!atomic_read(&core_data->suspend_stat))
 				return 0;
 			ts_info("resume");
+			core_data->aod_status = 0;
 			queue_work(core_data->event_wq, &core_data->resume_work);
 		}
 	}
