@@ -831,6 +831,17 @@ static struct tp_common_ops double_tap_ops = {
 	.show = double_tap_show,
 	.store = double_tap_store,
 };
+
+static ssize_t fp_state_show(struct kobject *kobj,
+                             struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d,%d,%d\n", goodix_core_data->fod_x, goodix_core_data->fod_y,
+		           goodix_core_data->fod_x || goodix_core_data->fod_y);
+}
+
+static struct tp_common_ops fp_state_ops = {
+	.show = fp_state_show,
+};
 #endif
 
 static DEVICE_ATTR(extmod_info, S_IRUGO, goodix_ts_extmod_show, NULL);
@@ -961,6 +972,12 @@ static int goodix_ts_input_report(struct input_dev *dev,
 			/*input_report_abs(dev, ABS_MT_TOUCH_MAJOR, coords->w);*/
 			/*input_report_abs(dev, ABS_MT_PRESSURE, coords->p);*/
 			/*input_report_abs(dev, ABS_MT_TOUCH_MINOR, coords->area);*/
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+			if (goodix_ts_finger_in_fod(coords->x, coords->y)) {
+				core_data->fod_x = coords->x;
+				core_data->fod_y = coords->y;
+			}
+#endif
 
 			if ((core_data->event_status & 0x88) != 0x88 || !core_data->fod_status)
 				coords->overlapping_area = 0;
@@ -994,6 +1011,9 @@ static int goodix_ts_input_report(struct input_dev *dev,
 		input_report_key(core_data->input_dev, BTN_INFO, 1);
 		input_report_key(core_data->input_dev, KEY_INFO, 1);
 		core_data->fod_pressed = true;
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+		tp_common_notify_fp_state();
+#endif
 		ts_info("BTN_INFO press");
 	} else if (core_data->fod_pressed && (core_data->event_status & 0x08) != 0x08) {
 		if (unlikely(!core_data->fod_test)) {
@@ -1001,6 +1021,11 @@ static int goodix_ts_input_report(struct input_dev *dev,
 			input_report_key(core_data->input_dev, KEY_INFO, 0);
 			ts_info("BTN_INFO release");
 			core_data->fod_pressed = false;
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+			core_data->fod_x = 0;
+			core_data->fod_y = 0;
+			tp_common_notify_fp_state();
+#endif
 		}
 	}
 	mutex_unlock(&ts_dev->report_mutex);
@@ -2567,6 +2592,11 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	r = tp_common_set_fod_status_ops(&fod_status_ops);
 	if (r < 0) {
 		ts_err("Failed to create fod_status node err=%d\n", r);
+	}
+
+	r = tp_common_set_fp_state_ops(&fp_state_ops);
+	if (r < 0) {
+		ts_err("Failed to create fp_state node err=%d\n", r);
 	}
 #endif
 
