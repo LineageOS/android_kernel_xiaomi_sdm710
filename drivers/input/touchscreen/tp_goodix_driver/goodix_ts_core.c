@@ -961,6 +961,12 @@ static int goodix_ts_input_report(struct input_dev *dev,
 			/*input_report_abs(dev, ABS_MT_TOUCH_MAJOR, coords->w);*/
 			/*input_report_abs(dev, ABS_MT_PRESSURE, coords->p);*/
 			/*input_report_abs(dev, ABS_MT_TOUCH_MINOR, coords->area);*/
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+			if (goodix_ts_finger_in_fod(coords->x, coords->y)) {
+				core_data->fod_x = coords->x;
+				core_data->fod_y = coords->y;
+			}
+#endif
 
 			if ((core_data->event_status & 0x88) != 0x88 || !core_data->fod_status)
 				coords->overlapping_area = 0;
@@ -994,6 +1000,9 @@ static int goodix_ts_input_report(struct input_dev *dev,
 		input_report_key(core_data->input_dev, BTN_INFO, 1);
 		input_report_key(core_data->input_dev, KEY_INFO, 1);
 		core_data->fod_pressed = true;
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+		tp_common_notify_fp_state();
+#endif
 		ts_info("BTN_INFO press");
 	} else if (core_data->fod_pressed && (core_data->event_status & 0x08) != 0x08) {
 		if (unlikely(!core_data->fod_test)) {
@@ -1001,6 +1010,11 @@ static int goodix_ts_input_report(struct input_dev *dev,
 			input_report_key(core_data->input_dev, KEY_INFO, 0);
 			ts_info("BTN_INFO release");
 			core_data->fod_pressed = false;
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+			core_data->fod_x = 0;
+			core_data->fod_y = 0;
+			tp_common_notify_fp_state();
+#endif
 		}
 	}
 	mutex_unlock(&ts_dev->report_mutex);

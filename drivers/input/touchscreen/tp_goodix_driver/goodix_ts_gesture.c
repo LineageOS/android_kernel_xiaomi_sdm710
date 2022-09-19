@@ -30,6 +30,10 @@
 #include <asm/atomic.h>
 #include "goodix_ts_core.h"
 
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+#include <linux/input/tp_common.h>
+#endif
+
 #define GSX_REG_GESTURE_DATA			0x4100
 #define GSX_REG_GESTURE				0x6F68
 
@@ -498,6 +502,11 @@ static int gsx_gesture_ist(struct goodix_ts_core *core_data,
 			/*input_report_abs(core_data->input_dev, ABS_MT_TOUCH_MINOR, area);*/
 
 			core_data->fod_pressed = true;
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+			core_data->fod_x = x;
+			core_data->fod_y = y;
+			tp_common_notify_fp_state();
+#endif
 			__set_bit(0, &core_data->touch_id);
 
 
@@ -533,6 +542,11 @@ static int gsx_gesture_ist(struct goodix_ts_core *core_data,
 				input_sync(core_data->input_dev);
 				__clear_bit(0, &core_data->touch_id);
 				core_data->fod_pressed = false;
+#ifdef CONFIG_TOUCHSCREEN_COMMON
+				core_data->fod_x = 0;
+				core_data->fod_y = 0;
+				tp_common_notify_fp_state();
+#endif
 			}
 			core_data->sleep_finger = 0;
 		}
