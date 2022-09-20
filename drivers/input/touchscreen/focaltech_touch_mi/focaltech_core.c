@@ -66,7 +66,6 @@ static int fts_ts_suspend(struct device *dev);
 static int fts_ts_resume(struct device *dev);
 static void fts_resume_work(struct work_struct *work);
 static void fts_suspend_work(struct work_struct *work);
-static int fts_read_and_report_foddata(struct fts_ts_data *data);
 
 struct device *fts_get_dev(void)
 {
@@ -723,114 +722,6 @@ static void fts_report_event(struct fts_ts_data *data)
 	input_sync(data->input_dev);
 }
 
-static int fts_read_and_report_foddata(struct fts_ts_data *data)
-{
-	u8 buf[10] = { 0 };
-	int ret;
-	int x, y, z;
-
-	buf[0] = FTS_REG_FOD_OUTPUT_ADDRESS;
-	ret = fts_i2c_read(data->client, buf, 1, buf + 1, 9);
-	if (ret < 0) {
-		FTS_ERROR("read fod failed, ret:%d", ret);
-		return ret;
-	} else {
-		/*
-		 * buf[1]: point id
-		 * buf[2]:event type， 0x24 is doubletap, 0x25 is single tap, 0x26 is fod pointer event
-		 * buf[3]: touch area/fod sensor area
-		 * buf[4]: touch area
-		 * buf[5-8]: x,y position
-		 * buf[9]:pointer up or down, 0 is down, 1 is up
-		 * */
-		switch (buf[2]) {
-		case 0x24:
-			FTS_INFO("DoubleClick Gesture detected, Wakeup panel\n");
-			input_report_key(data->input_dev, KEY_WAKEUP, 1);
-			input_sync(data->input_dev);
-			input_report_key(data->input_dev, KEY_WAKEUP, 0);
-			input_sync(data->input_dev);
-			break;
-		case 0x25:
-			FTS_INFO("FOD status report KEY_GOTO\n");
-			input_report_key(data->input_dev, KEY_GOTO, 1);
-			input_sync(data->input_dev);
-			input_report_key(data->input_dev, KEY_GOTO, 0);
-			input_sync(data->input_dev);
-			break;
-		case 0x26:
-			x = (buf[5] << 8) | buf[6];
-			y = (buf[7] << 8) | buf[8];
-			z = buf[4];
-			pr_info("FTS:read fod data: 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x anxis_x: %d anxis_y: %d\n",
-				buf[1], buf[2], buf[3], buf[4], buf[9], x, y);
-			if (buf[9] == 0) {
-				mutex_lock(&data->report_mutex);
-				if (!data->fod_finger_skip && !data->finger_in_fod) {
-					input_report_key(data->input_dev, BTN_INFO, 1);
-					input_sync(data->input_dev);
-					FTS_INFO("Report 0x155 Down for FingerPrint\n");
-					data->finger_in_fod = true;
-					data->fod_x = x;
-					data->fod_y = y;
-					tp_common_notify_fp_state();
-				}
-				if (!data->suspended) {
-					pr_info("FTS:touch is not in suspend state, report x,y value by touch nomal report\n");
-					mutex_unlock(&data->report_mutex);
-					return -EINVAL;
-				}
-				if (!data->aod_status) {
-					FTS_INFO("Panel is suspended but not in AOD mode, do not report touch down event\n");
-					mutex_unlock(&data->report_mutex);
-					return 0;
-				}
-
-				if (!data->fod_finger_skip) {
-					input_mt_slot(data->input_dev, buf[1]);
-					input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, 1);
-					input_report_key(data->input_dev, BTN_TOUCH, 1);
-					input_report_key(data->input_dev, BTN_TOOL_FINGER, 1);
-					input_report_abs(data->input_dev, ABS_MT_POSITION_X, x);
-					input_report_abs(data->input_dev, ABS_MT_POSITION_Y, y);
-					input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, z);
-					input_sync(data->input_dev);
-				}
-				mutex_unlock(&data->report_mutex);
-			} else {
-				if (data->finger_in_fod) {
-					input_report_key(data->input_dev, BTN_INFO, 0);
-					input_sync(data->input_dev);
-				}
-				data->finger_in_fod = false;
-				data->fod_finger_skip = false;
-				data->fod_x = 0;
-				data->fod_y = 0;
-				tp_common_notify_fp_state();
-				if (!data->suspended) {
-					pr_info("FTS:touch is not in suspend state, report x,y value by touch nomal report\n");
-					return -EINVAL;
-				}
-				mutex_lock(&data->report_mutex);
-				input_mt_slot(data->input_dev, buf[1]);
-				input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, 0);
-				input_report_key(data->input_dev, BTN_TOUCH, 0);
-				input_report_abs(data->input_dev, ABS_MT_TRACKING_ID, -1);
-				input_sync(data->input_dev);
-				mutex_unlock(&data->report_mutex);
-			}
-			break;
-		default:
-			if (data->suspended)
-				return 0;
-			else
-				return -EINVAL;
-			break;
-		}
-		return 0;
-	}
-}
-
 /*****************************************************************************
 *  Name: fts_read_touchdata
 *  Brief:
@@ -850,8 +741,8 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 	struct i2c_client *client = data->client;
 	u8 reg_value;
 
-	if (fts_read_and_report_foddata(data) == 0) {
-		FTS_INFO("succuss to get gesture data in irq handler");
+	if (fts_fod_gesture_readdata(data) == 0) {
+		FTS_INFO("succeeded to get fod/gesture data");
 		ret = fts_i2c_read_reg(fts_data->client, FTS_REG_INT_ACK, &reg_value);
 		if (ret < 0)
 			FTS_ERROR("read int ack error");
