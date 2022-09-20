@@ -522,7 +522,7 @@ static ssize_t fts_dumpreg_show(struct device *dev, struct device_attribute *att
 	fts_i2c_read_reg(client, FTS_REG_LCD_BUSY_NUM, &val);
 	count += snprintf(buf + count, PAGE_SIZE, "LCD Busy Number:0x%02x\n", val);
 
-	fts_i2c_read_reg(client, FTS_REG_GESTURE_EN, &val);
+	fts_i2c_read_reg(client, FTS_REG_GESTURE_MODE_EN, &val);
 	count += snprintf(buf + count, PAGE_SIZE, "Gesture Mode:0x%02x\n", val);
 
 	fts_i2c_read_reg(client, FTS_REG_CHARGER_MODE_EN, &val);

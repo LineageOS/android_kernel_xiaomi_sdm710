@@ -79,11 +79,12 @@
 #define FTS_REG_IDE_PARA_VER_ID             0xB5
 #define FTS_REG_IDE_PARA_STATUS             0xB6
 #define FTS_REG_CHARGER_MODE_EN             0x8B
-#define FTS_REG_GESTURE_EN                  0xD0
-#define FTS_REG_GESTURE_SUPPORT             0xCF
-#define FTS_REG_GESTURE_FOD_ON              0x02
-#define FTS_REG_GESTURE_FOD_NO_CAL          0x10
-#define FTS_REG_GESTURE_DOUBLETAP_ON        0x01
+#define FTS_REG_FEATURES                    0xCF /* Features */
+#define FTS_REG_FEATURES_DOUBLETAP          0x01 /* Double-tap feature */
+#define FTS_REG_FEATURES_FOD                0x02 /* FOD sensor feature */
+#define FTS_REG_FEATURES_FOD_NO_CAL         0x10
+#define FTS_REG_GESTURE_MODE_EN             0xD0 /* Gesture/normal mode */
+#define FTS_REG_GESTURE_MODE_MASK           0x01
 #define FTS_REG_GESTURE_OUTPUT_ADDRESS      0xD3
 #define FTS_REG_FOD_OUTPUT_ADDRESS          0xE1
 #define FTS_REG_MODULE_ID                   0xE3

@@ -1683,15 +1683,16 @@ static int fts_ts_suspend(struct device *dev)
 		goto release_finger;
 	}
 
-	ret = fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);
+	ret = fts_features_set(ts_data->client, FTS_REG_FEATURES_FOD,
+			       true);
 	if (ret < 0) {
 		FTS_ERROR("%s fts_fod_reg_write failed, enter sleep mode!\n", __func__);
 		goto sleep_mode;
 	}
 
-	fts_gesture_reg_write(ts_data->client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+	ret = fts_gesture_mode_set(ts_data->client, true);
 	if (ret < 0) {
-		FTS_ERROR("%s fts_gesture_reg_write failed, enter sleep mode!\n", __func__);
+		FTS_ERROR("Failed to set gesture mode, enter sleep mode\n");
 		goto sleep_mode;
 	}
 
@@ -1741,7 +1742,8 @@ static int fts_ts_resume(struct device *dev)
 	}
 	if (fts_data->finger_in_fod) {
 		fts_data->finger_in_fod = false;
-		fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_NO_CAL, true);
+		fts_features_set(ts_data->client, FTS_REG_FEATURES_FOD_NO_CAL,
+				 true);
 	}
 
 	fts_tp_state_recovery(ts_data->client);
@@ -1751,7 +1753,7 @@ static int fts_ts_resume(struct device *dev)
 		return 0;
 	}
 
-	fts_gesture_reg_write(ts_data->client, FTS_REG_GESTURE_DOUBLETAP_ON, false);
+	fts_gesture_mode_set(ts_data->client, false);
 	ts_data->suspended = false;
 	fts_irq_enable();
 	FTS_FUNC_EXIT();

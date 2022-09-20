@@ -96,9 +96,9 @@ void fts_gesture_recovery(struct i2c_client *client)
 		fts_i2c_write_reg(client, 0xD6, 0xff);
 		fts_i2c_write_reg(client, 0xD7, 0xff);
 		fts_i2c_write_reg(client, 0xD8, 0xff);
-		fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+		fts_gesture_mode_set(client, true);
 
-		fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+		fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, true);
 	}
 }
 
@@ -107,45 +107,45 @@ void fts_fod_recovery(struct i2c_client *client)
 	FTS_FUNC_ENTER();
 	if (fts_data->suspended) {
 		FTS_INFO("%s, tp is in suspend mode, write 0xd0 to 1", __func__);
-		fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+		fts_gesture_mode_set(client, true);
 	}
-	fts_fod_reg_write(client, FTS_REG_GESTURE_FOD_ON, true);
+	fts_features_set(client, FTS_REG_FEATURES_FOD, true);
 }
 
-int fts_fod_reg_write(struct i2c_client *client, u8 mask, bool enable)
+int fts_features_set(struct i2c_client *client, u8 features_mask, bool enable)
 {
 	int i, ret;
 
 	for (i = 0; i < 5; i++) {
-		ret = fts_i2c_update_reg(client, FTS_REG_GESTURE_SUPPORT,
-					 mask, enable);
+		ret = fts_i2c_update_reg(client, FTS_REG_FEATURES,
+					 features_mask, enable);
 		if (ret != -EAGAIN)
 			break;
 		msleep(1);
 	}
 
 	if (ret < 0) {
-		FTS_ERROR("Failed to update fod reg\n");
+		FTS_ERROR("Failed to update features register: %d", ret);
 		ret = -EIO;
 	}
 
 	return ret;
 }
 
-int fts_gesture_reg_write(struct i2c_client *client, u8 mask, bool enable)
+int fts_gesture_mode_set(struct i2c_client *client, bool enable)
 {
 	int i, ret;
 
 	for (i = 0; i < 5; i++) {
-		ret = fts_i2c_update_reg(client, FTS_REG_GESTURE_EN, mask,
-					 enable);
+		ret = fts_i2c_update_reg(client, FTS_REG_GESTURE_MODE_EN,
+					 FTS_REG_GESTURE_MODE_MASK, enable);
 		if (ret != -EAGAIN)
 			break;
 		msleep(1);
 	}
 
 	if (ret < 0) {
-                FTS_ERROR("Failed to update gesture reg\n");
+                FTS_ERROR("Failed to set gesture mode: %d", ret);
 		ret = -EIO;
         }
 
@@ -167,19 +167,20 @@ int fts_gesture_suspend(struct i2c_client *client)
 		FTS_INFO("Double-tap is disabled");
 		return -EINVAL;
 	}
-	ret = fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+
+	ret = fts_gesture_mode_set(client, true);
 	if (ret) {
-		FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
+		FTS_ERROR("Failed to set gesture mode: %d", ret);
 		return -EIO;
 	}
 
-	ret = fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+	ret = fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, true);
 	if (ret) {
-		FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
+		FTS_ERROR("Failed to enable double-tap feature");
 		return -EIO;
 	}
 
-	FTS_INFO("[GESTURE]Enter into gesture(suspend) successfully!");
+	FTS_INFO("Successfully entered gesture mode");
 
 	return 0;
 }
@@ -199,20 +200,21 @@ int fts_gesture_resume(struct i2c_client *client)
 		FTS_INFO("Double-tap is disabled");
 		return -EINVAL;
 	}
-	ret = fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, false);
+
+	ret = fts_gesture_mode_set(client, false);
 	if (ret) {
-		FTS_ERROR("[GESTURE]Resume from gesture failed!\n");
+		FTS_ERROR("Failed to leave gesture mode: %d", ret);
 		return -EIO;
 	}
 
-	ret = fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, false);
+	ret = fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, false);
 	if (ret) {
-		FTS_ERROR("[GESTURE]resume from gesture(suspend) failed!\n");
+		FTS_ERROR("Failed to disable double-tap feature: %d", ret);
 		return -EIO;
 	}
 
 	msleep(10);
-	FTS_INFO("[GESTURE]resume from gesture successfully!");
+	FTS_INFO("Successfully left gesture mode");
 
 	return 0;
 }
