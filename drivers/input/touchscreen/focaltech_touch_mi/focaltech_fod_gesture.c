@@ -18,49 +18,53 @@
 #include <linux/input/tp_common.h>
 #include "focaltech_core.h"
 
+#define FOD_EVENT_DOUBLE_TAP	0x24
+#define FOD_EVENT_SINGLE_TAP	0x25
+#define FOD_EVENT_FOD_PTR	0x26
+
+struct fts_fod_event {
+	__u8   point_id;
+	__u8   type;
+	__be16 area;
+	__be16 x;
+	__be16 y;
+	__u8   released;
+};
+
 int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 {
-	u8 buf[10] = { 0 };
-	int ret;
+	struct fts_fod_event ev;
 	int x, y, z;
+	int ret;
+	u8 reg;
 
-	buf[0] = FTS_REG_FOD_OUTPUT_ADDRESS;
-	ret = fts_i2c_read(ts_data->client, buf, 1, buf + 1, 9);
+	reg = FTS_REG_FOD_OUTPUT_ADDRESS;
+	ret = fts_i2c_read(ts_data->client, &reg, 1, (u8 *)&ev, sizeof(ev));
 	if (ret < 0) {
-		FTS_ERROR("read fod failed, ret:%d", ret);
+		FTS_ERROR("failed to read fod data, ret: %d", ret);
 		return ret;
 	}
 
-	/*
-	 * buf[1]: point id
-	 * buf[2]:event type， 0x24 is doubletap, 0x25 is single tap, 0x26 is fod pointer event
-	 * buf[3]: touch area/fod sensor area
-	 * buf[4]: touch area
-	 * buf[5-8]: x,y position
-	 * buf[9]:pointer up or down, 0 is down, 1 is up
-	 * */
-	switch (buf[2]) {
-	case 0x24:
+	switch (ev.type) {
+	case FOD_EVENT_DOUBLE_TAP:
 		FTS_INFO("DoubleClick Gesture detected, Wakeup panel\n");
 		input_report_key(ts_data->input_dev, KEY_WAKEUP, 1);
 		input_sync(ts_data->input_dev);
 		input_report_key(ts_data->input_dev, KEY_WAKEUP, 0);
 		input_sync(ts_data->input_dev);
 		break;
-	case 0x25:
+	case FOD_EVENT_SINGLE_TAP:
 		FTS_INFO("FOD status report KEY_GOTO\n");
 		input_report_key(ts_data->input_dev, KEY_GOTO, 1);
 		input_sync(ts_data->input_dev);
 		input_report_key(ts_data->input_dev, KEY_GOTO, 0);
 		input_sync(ts_data->input_dev);
 		break;
-	case 0x26:
-		x = (buf[5] << 8) | buf[6];
-		y = (buf[7] << 8) | buf[8];
-		z = buf[4];
-		pr_info("FTS:read fod data: 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x anxis_x: %d anxis_y: %d\n",
-			buf[1], buf[2], buf[3], buf[4], buf[9], x, y);
-		if (buf[9] == 0) {
+	case FOD_EVENT_FOD_PTR:
+		x = be16_to_cpu(ev.x);
+		y = be16_to_cpu(ev.y);
+		z = be16_to_cpu(ev.area);
+		if (!ev.released) {
 			mutex_lock(&ts_data->report_mutex);
 			if (!ts_data->fod_finger_skip && !ts_data->finger_in_fod) {
 				input_report_key(ts_data->input_dev, BTN_INFO, 1);
@@ -83,7 +87,7 @@ int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 			}
 
 			if (!ts_data->fod_finger_skip) {
-				input_mt_slot(ts_data->input_dev, buf[1]);
+				input_mt_slot(ts_data->input_dev, ev.point_id);
 				input_mt_report_slot_state(ts_data->input_dev, MT_TOOL_FINGER, 1);
 				input_report_key(ts_data->input_dev, BTN_TOUCH, 1);
 				input_report_key(ts_data->input_dev, BTN_TOOL_FINGER, 1);
@@ -108,7 +112,7 @@ int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 				return -EINVAL;
 			}
 			mutex_lock(&ts_data->report_mutex);
-			input_mt_slot(ts_data->input_dev, buf[1]);
+			input_mt_slot(ts_data->input_dev, ev.point_id);
 			input_mt_report_slot_state(ts_data->input_dev, MT_TOOL_FINGER, 0);
 			input_report_key(ts_data->input_dev, BTN_TOUCH, 0);
 			input_report_abs(ts_data->input_dev, ABS_MT_TRACKING_ID, -1);
@@ -123,6 +127,11 @@ int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 			return -EINVAL;
 		break;
 	}
+
+	FTS_INFO("FOD data: point_id=%u, type=%u, area=%u, x=%u, y=%u, rel=%u",
+		 ev.point_id, ev.type, be16_to_cpu(ev.area), be16_to_cpu(ev.x),
+		 be16_to_cpu(ev.y), ev.released);
+
 
 	return 0;
 }
