@@ -1833,13 +1833,11 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	}
 #endif
 
-#if FTS_SYSFS_NODE_EN
 	ret = fts_create_sysfs(client);
 	if (ret) {
 		FTS_ERROR("create sysfs node fail");
 		goto err_debugfs_create;
 	}
-#endif
 
 	ret = fts_ex_mode_init(client);
 	if (ret) {
@@ -1989,9 +1987,7 @@ static int fts_ts_remove(struct i2c_client *client)
 	fts_release_apk_debug_channel(ts_data);
 #endif
 
-#if FTS_SYSFS_NODE_EN
 	fts_remove_sysfs(client);
-#endif
 	destroy_workqueue(ts_data->event_wq);
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
 	destroy_workqueue(ts_data->ts_wait_i2c_wq);

@@ -250,10 +250,8 @@ void fts_release_apk_debug_channel(struct fts_ts_data *);
 #endif
 
 /* ADB functions */
-#if FTS_SYSFS_NODE_EN
 int fts_create_sysfs(struct i2c_client *client);
 int fts_remove_sysfs(struct i2c_client *client);
-#endif
 
 /* FW upgrade */
 int fts_upgrade_bin(struct i2c_client *client, char *fw_name, bool force);

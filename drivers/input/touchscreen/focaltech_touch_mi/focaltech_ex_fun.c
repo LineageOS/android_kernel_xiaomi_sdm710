@@ -785,6 +785,7 @@ int fts_create_sysfs(struct i2c_client *client)
 {
 	int ret = 0;
 
+#if FTS_SYSFS_NODE_EN
 	ret = sysfs_create_group(&client->dev.kobj, &fts_attribute_group);
 	if (ret) {
 		FTS_ERROR("[EX]: sysfs_create_group() failed!!");
@@ -793,7 +794,7 @@ int fts_create_sysfs(struct i2c_client *client)
 	} else {
 		FTS_INFO("[EX]: sysfs_create_group() succeeded!!");
 	}
-
+#endif
 	return ret;
 }
 
@@ -806,6 +807,8 @@ int fts_create_sysfs(struct i2c_client *client)
 ***********************************************************************/
 int fts_remove_sysfs(struct i2c_client *client)
 {
+#if FTS_SYSFS_NODE_EN
 	sysfs_remove_group(&client->dev.kobj, &fts_attribute_group);
+#endif
 	return 0;
 }
