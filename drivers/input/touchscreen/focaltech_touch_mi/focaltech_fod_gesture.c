@@ -31,10 +31,107 @@ struct fts_fod_event {
 	__u8   released;
 };
 
+static inline bool fts_fod_is_changed(struct fts_ts_data *ts_data,
+				      bool is_pressed)
+{
+	bool was_pressed = ts_data->finger_in_fod;
+
+	if (is_pressed && ts_data->fod_finger_skip)
+		return false;
+
+	return was_pressed != is_pressed;
+}
+
+static int fts_fod_report_ptr_event(struct fts_ts_data *ts_data,
+				    struct fts_fod_event *ev)
+{
+	struct input_dev *input_dev = ts_data->input_dev;
+	bool pressed;
+	int x, y, z;
+
+	x = be16_to_cpu(ev->x);
+	y = be16_to_cpu(ev->y);
+	z = be16_to_cpu(ev->area);
+	pressed = !ev->released;
+
+	if (fts_fod_is_changed(ts_data, pressed)) {
+		ts_data->finger_in_fod = pressed;
+		ts_data->fod_x = x;
+		ts_data->fod_y = y;
+		tp_common_notify_fp_state();
+		input_report_key(input_dev, BTN_INFO, pressed ? 1 : 0);
+		input_sync(input_dev);
+	}
+
+	if (!pressed)
+		ts_data->fod_finger_skip = false;
+
+	if (!ts_data->suspended) {
+		FTS_INFO("Not suspended. Report by normal touch report\n");
+		return -EINVAL;
+	}
+
+	if (!pressed) {
+		input_mt_slot(input_dev, ev->point_id);
+		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 0);
+		input_report_key(input_dev, BTN_TOUCH, 0);
+		input_report_abs(input_dev, ABS_MT_TRACKING_ID, -1);
+		input_sync(input_dev);
+
+		return 0;
+	}
+
+	if (ts_data->aod_status && !ts_data->fod_finger_skip) {
+		input_mt_slot(input_dev, ev->point_id);
+		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 1);
+		input_report_key(input_dev, BTN_TOUCH, 1);
+		input_report_key(input_dev, BTN_TOOL_FINGER, 1);
+		input_report_abs(input_dev, ABS_MT_POSITION_X, x);
+		input_report_abs(input_dev, ABS_MT_POSITION_Y, y);
+		input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, z);
+		input_sync(input_dev);
+	}
+
+	return 0;
+}
+
+static int fts_fod_report(struct fts_ts_data *ts_data, struct fts_fod_event *ev)
+{
+	struct input_dev *input_dev = ts_data->input_dev;
+	int ret = 0;
+
+	switch (ev->type) {
+	case FOD_EVENT_DOUBLE_TAP:
+		FTS_INFO("Double-tap detected, wake-up system\n");
+		input_report_key(input_dev, KEY_WAKEUP, 1);
+		input_sync(input_dev);
+		input_report_key(input_dev, KEY_WAKEUP, 0);
+		input_sync(input_dev);
+		break;
+	case FOD_EVENT_SINGLE_TAP:
+		FTS_INFO("FOD status report KEY_GOTO\n");
+		input_report_key(input_dev, KEY_GOTO, 1);
+		input_sync(input_dev);
+		input_report_key(input_dev, KEY_GOTO, 0);
+		input_sync(input_dev);
+		break;
+	case FOD_EVENT_FOD_PTR:
+		ret = fts_fod_report_ptr_event(ts_data, ev);
+		break;
+	default:
+		return ts_data->suspended ? 0 : -EINVAL;
+	}
+
+	FTS_INFO("FOD data: point_id=%u, type=%u, area=%u, x=%u, y=%u, rel=%u",
+		 ev->point_id, ev->type, be16_to_cpu(ev->area),
+		 be16_to_cpu(ev->x), be16_to_cpu(ev->y), ev->released);
+
+	return ret;
+}
+
 int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 {
 	struct fts_fod_event ev;
-	int x, y, z;
 	int ret;
 	u8 reg;
 
@@ -45,93 +142,9 @@ int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 		return ret;
 	}
 
-	switch (ev.type) {
-	case FOD_EVENT_DOUBLE_TAP:
-		FTS_INFO("DoubleClick Gesture detected, Wakeup panel\n");
-		input_report_key(ts_data->input_dev, KEY_WAKEUP, 1);
-		input_sync(ts_data->input_dev);
-		input_report_key(ts_data->input_dev, KEY_WAKEUP, 0);
-		input_sync(ts_data->input_dev);
-		break;
-	case FOD_EVENT_SINGLE_TAP:
-		FTS_INFO("FOD status report KEY_GOTO\n");
-		input_report_key(ts_data->input_dev, KEY_GOTO, 1);
-		input_sync(ts_data->input_dev);
-		input_report_key(ts_data->input_dev, KEY_GOTO, 0);
-		input_sync(ts_data->input_dev);
-		break;
-	case FOD_EVENT_FOD_PTR:
-		x = be16_to_cpu(ev.x);
-		y = be16_to_cpu(ev.y);
-		z = be16_to_cpu(ev.area);
-		if (!ev.released) {
-			mutex_lock(&ts_data->report_mutex);
-			if (!ts_data->fod_finger_skip && !ts_data->finger_in_fod) {
-				input_report_key(ts_data->input_dev, BTN_INFO, 1);
-				input_sync(ts_data->input_dev);
-				FTS_INFO("Report 0x155 Down for FingerPrint\n");
-				ts_data->finger_in_fod = true;
-				ts_data->fod_x = x;
-				ts_data->fod_y = y;
-				tp_common_notify_fp_state();
-			}
-			if (!ts_data->suspended) {
-				pr_info("FTS:touch is not in suspend state, report x,y value by touch nomal report\n");
-				mutex_unlock(&ts_data->report_mutex);
-				return -EINVAL;
-			}
-			if (!ts_data->aod_status) {
-				FTS_INFO("Panel is suspended but not in AOD mode, do not report touch down event\n");
-				mutex_unlock(&ts_data->report_mutex);
-				return 0;
-			}
+	mutex_lock(&ts_data->report_mutex);
+	ret = fts_fod_report(ts_data, &ev);
+	mutex_unlock(&ts_data->report_mutex);
 
-			if (!ts_data->fod_finger_skip) {
-				input_mt_slot(ts_data->input_dev, ev.point_id);
-				input_mt_report_slot_state(ts_data->input_dev, MT_TOOL_FINGER, 1);
-				input_report_key(ts_data->input_dev, BTN_TOUCH, 1);
-				input_report_key(ts_data->input_dev, BTN_TOOL_FINGER, 1);
-				input_report_abs(ts_data->input_dev, ABS_MT_POSITION_X, x);
-				input_report_abs(ts_data->input_dev, ABS_MT_POSITION_Y, y);
-				input_report_abs(ts_data->input_dev, ABS_MT_TOUCH_MAJOR, z);
-				input_sync(ts_data->input_dev);
-			}
-			mutex_unlock(&ts_data->report_mutex);
-		} else {
-			if (ts_data->finger_in_fod) {
-				input_report_key(ts_data->input_dev, BTN_INFO, 0);
-				input_sync(ts_data->input_dev);
-			}
-			ts_data->finger_in_fod = false;
-			ts_data->fod_finger_skip = false;
-			ts_data->fod_x = 0;
-			ts_data->fod_y = 0;
-			tp_common_notify_fp_state();
-			if (!ts_data->suspended) {
-				pr_info("FTS:touch is not in suspend state, report x,y value by touch nomal report\n");
-				return -EINVAL;
-			}
-			mutex_lock(&ts_data->report_mutex);
-			input_mt_slot(ts_data->input_dev, ev.point_id);
-			input_mt_report_slot_state(ts_data->input_dev, MT_TOOL_FINGER, 0);
-			input_report_key(ts_data->input_dev, BTN_TOUCH, 0);
-			input_report_abs(ts_data->input_dev, ABS_MT_TRACKING_ID, -1);
-			input_sync(ts_data->input_dev);
-			mutex_unlock(&ts_data->report_mutex);
-		}
-		break;
-	default:
-		if (ts_data->suspended)
-			return 0;
-		else
-			return -EINVAL;
-		break;
-	}
-
-	FTS_INFO("FOD data: point_id=%u, type=%u, area=%u, x=%u, y=%u, rel=%u",
-		 ev.point_id, ev.type, be16_to_cpu(ev.area), be16_to_cpu(ev.x),
-		 be16_to_cpu(ev.y), ev.released);
-
-
-	return 0;
+	return ret;
 }
