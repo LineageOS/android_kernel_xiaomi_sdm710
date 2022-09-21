@@ -43,25 +43,8 @@
 * Global variable or extern global variabls/functions
 *****************************************************************************/
 /* Upgrade FW/PRAMBOOT/LCD CFG */
-u8 fw_file[] = {
+static u8 fw_file[] = {
 #include FTS_UPGRADE_FW_FILE
-};
-
-u8 fw_file2[] = {
-#include FTS_UPGRADE_FW2_FILE
-};
-
-u8 fw_file3[] = {
-#include FTS_UPGRADE_FW3_FILE
-};
-
-struct upgrade_fw fw_list[] = {
-	{FTS_VENDOR_ID, fw_file, sizeof(fw_file)}
-	,
-	{FTS_VENDOR_ID2, fw_file2, sizeof(fw_file2)}
-	,
-	{FTS_VENDOR_ID3, fw_file3, sizeof(fw_file3)}
-	,
 };
 
 struct upgrade_func *upgrade_func_list[] = {
@@ -1449,39 +1432,13 @@ int fts_fwupg_get_vendorid(struct fts_ts_data *ts_data, u16 *vid)
  */
 static int fts_fwupg_get_fw_file(struct fts_ts_data *ts_data)
 {
-	struct upgrade_fw *fw = &fw_list[0];
 	struct fts_upgrade *upg = fwupgrade;
 
-#if (FTS_GET_VENDOR_ID_NUM > 1)
-	int ret = 0;
-	int i = 0;
-	u16 vendor_id = 0;
-
-	/* support multi vendor, must read correct vendor id */
-	ret = fts_fwupg_get_vendorid(ts_data, &vendor_id);
-	if (ret < 0) {
-		FTS_ERROR("get vendor id failed");
-		return ret;
-	}
-	FTS_INFO("success to read vendor id:%04x", vendor_id);
-	for (i = 0; i < FTS_GET_VENDOR_ID_NUM; i++) {
-		fw = &fw_list[i];
-		if (vendor_id == fw->vendor_id) {
-			FTS_INFO("vendor id match, get fw file successfully");
-			break;
-		}
-	}
-	if (i >= FTS_GET_VENDOR_ID_NUM) {
-		FTS_ERROR("no vendor id match, don't get file");
-		return -ENODATA;
-	}
-#endif
-
 	if (upg) {
-		upg->fw = fw->fw_file;
-		upg->fw_length = fw->fw_len;
-		upg->lic = fw->fw_file;
-		upg->lic_length = fw->fw_len;
+		upg->fw = fw_file;
+		upg->fw_length = sizeof(fw_file);
+		upg->lic = fw_file;
+		upg->lic_length = sizeof(fw_file);
 
 		FTS_INFO("upgrade fw file len:%x", upg->fw_length);
 		if ((upg->fw_length < FTS_MIN_LEN)
