@@ -1472,92 +1472,6 @@ static const struct file_operations fts_fw_version_ops = {
 	.read = fts_fw_version_read,
 };
 
-static void tpdbg_suspend(struct fts_ts_data *ts_data, bool enable)
-{
-	if (enable)
-		fts_ts_suspend(&ts_data->client->dev);
-	else
-		fts_ts_resume(&ts_data->client->dev);
-}
-
-static int tpdbg_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-
-	return 0;
-}
-
-static ssize_t tpdbg_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
-{
-
-	const char *str = "cmd support as below:\n \
-				\necho \"irq-disable\" or \"irq-enable\" to ctrl irq\n \
-				\necho \"tp-suspend-en\" or \"tp-suspend-off\" to ctrl panel in or off suspend status\n \
-				\necho \"tp-sd-en\" or \"tp-sd-off\" to ctrl panel in or off sleep status\n";
-
-	loff_t pos = *ppos;
-	int len = strlen(str);
-
-	if (pos < 0)
-		return -EINVAL;
-	if (pos >= len)
-		return 0;
-
-	if (copy_to_user(buf, str, len))
-		return -EFAULT;
-
-	*ppos = pos + len;
-
-	return len;
-}
-
-static ssize_t tpdbg_write(struct file *file, const char __user *buf, size_t size, loff_t *ppos)
-{
-	struct fts_ts_data *ts_data = file->private_data;
-	char *cmd = kzalloc(size, GFP_KERNEL);
-	int ret = size;
-
-	if (!cmd)
-		return -ENOMEM;
-	if (copy_from_user(cmd, buf, size)) {
-		ret = -EFAULT;
-		goto out;
-	}
-
-	if (!strncmp(cmd, "irq-disable", 11))
-		fts_irq_disable();
-	else if (!strncmp(cmd, "irq-enable", 10))
-		fts_irq_enable();
-	else if (!strncmp(cmd, "tp-suspend-en", 13))
-		tpdbg_suspend(ts_data, true);
-	else if (!strncmp(cmd, "tp-suspend-off", 14))
-		tpdbg_suspend(ts_data, false);
-	else if (!strncmp(cmd, "tp-sd-en", 8))
-		tpdbg_suspend(ts_data, true);
-	else if (!strncmp(cmd, "tp-sd-off", 9)) {
-		tpdbg_suspend(ts_data, false);
-	}
-out:
-	kfree(cmd);
-
-	return ret;
-}
-
-static int tpdbg_release(struct inode *inode, struct file *file)
-{
-	file->private_data = NULL;
-
-	return 0;
-}
-
-static const struct file_operations tpdbg_operations = {
-	.owner = THIS_MODULE,
-	.open = tpdbg_open,
-	.read = tpdbg_read,
-	.write = tpdbg_write,
-	.release = tpdbg_release,
-};
-
 static void fts_power_supply_work(struct work_struct *work)
 {
 	struct fts_ts_data *ts_data = container_of(work, struct fts_ts_data, power_supply_work);
@@ -1712,7 +1626,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	int ret = 0;
 	struct fts_ts_platform_data *pdata;
 	struct fts_ts_data *ts_data;
-	struct dentry *tp_debugfs;
 
 	FTS_FUNC_ENTER();
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
@@ -1815,33 +1728,22 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	ts_data->tp_lockdown_info_proc = proc_create("tp_lockdown_info", 0644, NULL, &fts_lockdown_info_ops);
 	ts_data->tp_fw_version_proc = proc_create("tp_fw_version", 0644, NULL, &fts_fw_version_ops);
 
-	ts_data->debugfs = debugfs_create_dir("tp_debug", NULL);
-	if (!ts_data->debugfs) {
-		FTS_ERROR("create tp_debug fail");
-		goto err_sysfs_create_group;
-	}
-	tp_debugfs = debugfs_create_file("switch_state", 0660, ts_data->debugfs, ts_data, &tpdbg_operations);
-	if (!tp_debugfs) {
-		FTS_ERROR("create debugfs fail");
-		goto err_sysfs_create_group;
-	}
-
 	ret = fts_create_sysfs(client);
 	if (ret) {
 		FTS_ERROR("create sysfs node fail");
-		goto err_debugfs_create;
+		goto err_sysfs_create_group;
 	}
 
 	ret = fts_ex_mode_init(client);
 	if (ret) {
 		FTS_ERROR("init glove/cover/charger fail");
-		goto err_debugfs_create;
+		goto err_sysfs_create_group;
 	}
 
 	ret = fts_gesture_init(ts_data);
 	if (ret) {
 		FTS_ERROR("init gesture fail");
-		goto err_debugfs_create;
+		goto err_sysfs_create_group;
 	}
 
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
@@ -1852,7 +1754,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 			    WQ_UNBOUND | WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
 	if (!ts_data->ts_wait_i2c_wq) {
 		FTS_ERROR("failed to create fts wait i2c workqueue thread\n");
-		goto err_debugfs_create;
+		goto err_sysfs_create_group;
 	}
 	INIT_WORK(&ts_data->read_touch_data_work, fts_try_readdata_func);
 #endif
@@ -1864,7 +1766,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
 		goto err_wait_i2c_wq;
 #else
-		goto err_debugfs_create;
+		goto err_sysfs_create_group;
 #endif
 	}
 
@@ -1930,9 +1832,6 @@ err_wait_i2c_wq:
 	if (ts_data->ts_wait_i2c_wq)
 		destroy_workqueue(ts_data->ts_wait_i2c_wq);
 #endif
-err_debugfs_create:
-	if (tp_debugfs)
-		debugfs_remove(tp_debugfs);
 err_sysfs_create_group:
 	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
 err_irq_req:

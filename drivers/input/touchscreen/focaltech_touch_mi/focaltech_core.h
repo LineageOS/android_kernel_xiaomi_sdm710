@@ -196,7 +196,6 @@ struct fts_ts_data {
 #ifdef CONFIG_DRM
 	struct notifier_block fb_notif;
 #endif
-	struct dentry *debugfs;
 	struct proc_dir_entry *tp_selftest_proc;
 	struct proc_dir_entry *tp_data_dump_proc;
 	struct proc_dir_entry *tp_fw_version_proc;
