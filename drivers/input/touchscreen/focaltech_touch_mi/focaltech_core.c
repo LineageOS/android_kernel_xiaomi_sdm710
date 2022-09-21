@@ -1825,13 +1825,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		FTS_ERROR("create debugfs fail");
 		goto err_sysfs_create_group;
 	}
-#if FTS_APK_NODE_EN
-	ret = fts_create_apk_debug_channel(ts_data);
-	if (ret) {
-		FTS_ERROR("create apk debug node fail");
-		goto err_debugfs_create;
-	}
-#endif
 
 	ret = fts_create_sysfs(client);
 	if (ret) {
@@ -1982,10 +1975,6 @@ static int fts_ts_remove(struct i2c_client *client)
 	ts_data->fts_tp_class = NULL;
 
 	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
-
-#if FTS_APK_NODE_EN
-	fts_release_apk_debug_channel(ts_data);
-#endif
 
 	fts_remove_sysfs(client);
 	destroy_workqueue(ts_data->event_wq);

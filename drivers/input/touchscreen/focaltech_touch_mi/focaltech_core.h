@@ -243,12 +243,6 @@ int fts_gesture_reg_write(struct i2c_client *client, u8 mask, bool enable);
 int fts_fod_reg_write(struct i2c_client *client, u8 mask, bool enable);
 void fts_fod_recovery(struct i2c_client *client);
 
-/* Apk and functions */
-#if FTS_APK_NODE_EN
-int fts_create_apk_debug_channel(struct fts_ts_data *);
-void fts_release_apk_debug_channel(struct fts_ts_data *);
-#endif
-
 /* ADB functions */
 int fts_create_sysfs(struct i2c_client *client);
 int fts_remove_sysfs(struct i2c_client *client);
