@@ -146,8 +146,6 @@ struct fts_ts_data {
 	struct ts_ic_info ic_info;
 	struct workqueue_struct *ts_workqueue;
 	struct work_struct fwupg_work;
-	struct delayed_work esdcheck_work;
-	struct delayed_work prc_work;
 	struct regulator *vsp;
 	struct regulator *vsn;
 	struct regulator *vddio;
@@ -166,24 +164,15 @@ struct fts_ts_data {
 	/* multi-touch */
 	struct ts_event *events;
 	u8 *point_buf;
-	/*
-	  *when finger down in fod area, sometime finger id will change.
-	  *so we need to release the old id point to avoid ghost point.
-	  */
 	int pnt_buf_size;
 	int touchs;
-	bool key_down;
 	int touch_point;
 	int point_num;
-	short chipid;
-	struct proc_dir_entry *proc;
-	u8 proc_opmode;
 	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];
 #ifdef CONFIG_PM
 	bool dev_pm_suspend;
 	struct completion pm_completion;
 #endif
-	bool lpwg_mode;
 	bool fw_forceupdate;
 	struct work_struct suspend_work;
 	struct work_struct resume_work;
@@ -195,9 +184,6 @@ struct fts_ts_data {
 #ifdef CONFIG_DRM
 	struct notifier_block fb_notif;
 #endif
-	struct proc_dir_entry *tp_selftest_proc;
-	struct proc_dir_entry *tp_data_dump_proc;
-	bool factory_test_result;
 	struct notifier_block power_supply_notifier;
 	struct notifier_block bl_notif;
 	struct work_struct power_supply_work;
@@ -207,7 +193,6 @@ struct fts_ts_data {
 	int fod_x;
 	int fod_y;
 	int overlap_area;
-	bool is_tp_testing;
 	int aod_status;
 };
 

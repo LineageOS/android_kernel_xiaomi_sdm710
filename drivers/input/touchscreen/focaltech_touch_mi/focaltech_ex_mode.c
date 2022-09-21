@@ -127,10 +127,6 @@ static int fts_enter_charger_mode(struct i2c_client *client, int mode)
 	static u8 buf_value[2] = { 0 };
 	buf_addr[0] = FTS_REG_CHARGER_MODE_EN;	/* charger control */
 
-	if (fts_data->is_tp_testing) {
-		FTS_ERROR("tp is doing test, skip set charger mode\n");
-		return -EINVAL;
-	}
 	if (mode)
 		buf_value[0] = 0x01;
 	else

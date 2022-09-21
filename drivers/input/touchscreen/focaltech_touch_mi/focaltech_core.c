@@ -211,7 +211,6 @@ static int fts_get_ic_information(struct fts_ts_data *ts_data)
 			return ret;
 		}
 	}
-	ts_data->chipid = (short)(chip_id[0] << 8 | chip_id[1]);
 	FTS_INFO("get ic information, chip id = 0x%02x%02x", ts_data->ic_info.ids.chip_idh,
 		 ts_data->ic_info.ids.chip_idl);
 
@@ -628,11 +627,9 @@ static int fts_input_report_key(struct fts_ts_data *data, int index)
 	for (ik = 0; ik < key_num; ik++) {
 		if (TOUCH_IN_KEY(x, data->pdata->key_x_coords[ik])) {
 			if (EVENT_DOWN(flag)) {
-				data->key_down = true;
 				input_report_key(data->input_dev, data->pdata->keys[ik], 1);
 				FTS_DEBUG("Key%d(%d, %d) DOWN!", ik, x, y);
 			} else {
-				data->key_down = false;
 				input_report_key(data->input_dev, data->pdata->keys[ik], 0);
 				FTS_DEBUG("Key%d(%d, %d) Up!", ik, x, y);
 			}
