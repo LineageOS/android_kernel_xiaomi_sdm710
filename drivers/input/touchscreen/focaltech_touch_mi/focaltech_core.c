@@ -1423,59 +1423,6 @@ static const struct attribute_group fts_attr_group = {
 	.attrs = fts_attrs
 };
 
-#define TP_INFO_MAX_LENGTH 50
-static ssize_t fts_lockdown_info_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
-{
-	int cnt = 0, ret = 0;
-	char tmp[TP_INFO_MAX_LENGTH];
-
-	if (*pos != 0)
-		return 0;
-
-	cnt =
-	    snprintf(tmp, TP_INFO_MAX_LENGTH,
-		     "0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
-		     fts_data->lockdown_info[0], fts_data->lockdown_info[1],
-		     fts_data->lockdown_info[2], fts_data->lockdown_info[3], fts_data->lockdown_info[4],
-		     fts_data->lockdown_info[5], fts_data->lockdown_info[6], fts_data->lockdown_info[7]);
-	ret = copy_to_user(buf, tmp, cnt);
-
-	*pos += cnt;
-	if (ret != 0)
-		return 0;
-	else
-		return cnt;
-}
-
-static const struct file_operations fts_lockdown_info_ops = {
-	.read = fts_lockdown_info_read,
-};
-
-static ssize_t fts_fw_version_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
-{
-	int cnt = 0, ret = 0;
-	char tmp[TP_INFO_MAX_LENGTH];
-	u8 major_version, minor_version;
-
-	if (*pos != 0)
-		return 0;
-
-	fts_i2c_read_reg(fts_data->client, FTS_REG_FW_VER, &major_version);
-	fts_i2c_read_reg(fts_data->client, 0xAD, &minor_version);
-
-	cnt = snprintf(tmp, TP_INFO_MAX_LENGTH, "0x%x:0x%x\n", major_version, minor_version);
-	ret = copy_to_user(buf, tmp, cnt);
-	*pos += cnt;
-	if (ret != 0)
-		return 0;
-	else
-		return cnt;
-}
-
-static const struct file_operations fts_fw_version_ops = {
-	.read = fts_fw_version_read,
-};
-
 static void fts_power_supply_work(struct work_struct *work)
 {
 	struct fts_ts_data *ts_data = container_of(work, struct fts_ts_data, power_supply_work);
@@ -1728,9 +1675,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		FTS_ERROR("fail to export sysfs entires\n");
 		goto err_irq_req;
 	}
-
-	ts_data->tp_lockdown_info_proc = proc_create("tp_lockdown_info", 0644, NULL, &fts_lockdown_info_ops);
-	ts_data->tp_fw_version_proc = proc_create("tp_fw_version", 0644, NULL, &fts_fw_version_ops);
 
 	ret = fts_create_sysfs(client);
 	if (ret) {

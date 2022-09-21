@@ -198,8 +198,6 @@ struct fts_ts_data {
 #endif
 	struct proc_dir_entry *tp_selftest_proc;
 	struct proc_dir_entry *tp_data_dump_proc;
-	struct proc_dir_entry *tp_fw_version_proc;
-	struct proc_dir_entry *tp_lockdown_info_proc;
 	bool factory_test_result;
 	struct notifier_block power_supply_notifier;
 	struct notifier_block bl_notif;
