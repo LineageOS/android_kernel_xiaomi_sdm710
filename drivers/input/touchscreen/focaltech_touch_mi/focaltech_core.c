@@ -1668,17 +1668,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
                           __func__, ret);
 	}
 
-	if (ts_data->fts_tp_class == NULL) {
-		ts_data->fts_tp_class = class_create(THIS_MODULE, "touch");
-		if (ts_data->fts_tp_class) {
-			ts_data->fts_touch_dev = device_create(ts_data->fts_tp_class, NULL, 0x38, ts_data, "tp_dev");
-			if (IS_ERR(ts_data->fts_touch_dev)) {
-				FTS_ERROR("Failed to create device !\n");
-				goto err_class_create;
-			}
-			dev_set_drvdata(ts_data->fts_touch_dev, ts_data);
-		}
-	}
 	ret = fts_fwupg_init(ts_data);
 	if (ret) {
 		FTS_ERROR("init fw upgrade fail");
@@ -1686,9 +1675,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	FTS_FUNC_EXIT();
 	return 0;
-err_class_create:
-	class_destroy(ts_data->fts_tp_class);
-	ts_data->fts_tp_class = NULL;
 err_event_wq:
 	if (ts_data->event_wq)
 		destroy_workqueue(ts_data->event_wq);
@@ -1729,9 +1715,6 @@ static int fts_ts_remove(struct i2c_client *client)
 	struct fts_ts_data *ts_data = i2c_get_clientdata(client);
 
 	FTS_FUNC_ENTER();
-	device_destroy(ts_data->fts_tp_class, 0x38);
-	class_destroy(ts_data->fts_tp_class);
-	ts_data->fts_tp_class = NULL;
 
 	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
 

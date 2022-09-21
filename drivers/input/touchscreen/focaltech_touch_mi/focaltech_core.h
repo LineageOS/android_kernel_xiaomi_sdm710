@@ -207,8 +207,6 @@ struct fts_ts_data {
 	int fod_x;
 	int fod_y;
 	int overlap_area;
-	struct class *fts_tp_class;
-	struct device *fts_touch_dev;
 	bool is_tp_testing;
 	int aod_status;
 };
