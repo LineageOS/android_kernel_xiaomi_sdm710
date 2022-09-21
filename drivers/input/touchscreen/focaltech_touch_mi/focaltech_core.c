@@ -46,20 +46,16 @@
 #define FTS_DRIVER_NAME                     "fts_ts"
 #define INTERVAL_READ_REG                   100	/* unit:ms */
 #define TIMEOUT_READ_REG                    2000	/* unit:ms */
-#ifdef FTS_POWER_SOURCE_CUST_EN
 #define FTS_VTG_MIN_UV                      2600000
 #define FTS_VTG_MAX_UV                      3300000
 #define FTS_I2C_VTG_MIN_UV                  1800000
 #define FTS_I2C_VTG_MAX_UV                  1800000
-#endif
 
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
 struct fts_ts_data *fts_data;
-#if FTS_CHARGER_EN
 extern int fts_charger_mode_set(struct i2c_client *client, bool on);
-#endif
 
 /*****************************************************************************
 * Static function prototypes
@@ -255,9 +251,7 @@ void fts_tp_state_recovery(struct i2c_client *client)
 	/* recover TP cover state 0xC1 */
 	fts_ex_mode_recovery(client);
 	/* recover TP gesture state 0xD0 */
-#if FTS_GESTURE_EN
 	fts_gesture_recovery(client);
-#endif
 	FTS_FUNC_EXIT();
 }
 
@@ -277,9 +271,8 @@ int fts_reset_proc(int hdelayms)
 	if (hdelayms) {
 		msleep(hdelayms);
 	}
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 	fts_fod_recovery(fts_data->client);
-#endif
 
 	FTS_FUNC_EXIT();
 	return 0;
@@ -349,7 +342,6 @@ void fts_irq_enable(void)
 
 }
 
-#ifdef FTS_POWER_SOURCE_CUST_EN
 /*****************************************************************************
 * Power Control
 *****************************************************************************/
@@ -478,7 +470,6 @@ static int fts_power_source_ctrl(struct fts_ts_data *data, int enable)
 	return ret;
 }
 
-#if FTS_PINCTRL_EN
 /*****************************************************************************
 *  Name: fts_pinctrl_init
 *  Brief:
@@ -576,9 +567,6 @@ static int fts_pinctrl_select_release(struct fts_ts_data *ts)
 
 	return ret;
 }
-#endif /* FTS_PINCTRL_EN */
-
-#endif /* FTS_POWER_SOURCE_CUST_EN */
 
 /*****************************************************************************
 *  Reprot related
@@ -619,12 +607,12 @@ static void fts_release_all_finger(void)
 	u32 finger_count = 0;
 
 	FTS_FUNC_ENTER();
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 	fts_data->finger_in_fod = false;
 	fts_data->fod_x = 0;
 	fts_data->fod_y = 0;
 	fts_data->overlap_area = 0;
-#endif
+
 	for (finger_count = 0; finger_count < fts_data->pdata->max_touch_number; finger_count++) {
 		input_mt_slot(input_dev, finger_count);
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
@@ -759,7 +747,6 @@ static void fts_report_event(struct fts_ts_data *data)
 	input_sync(data->input_dev);
 }
 
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 static int fts_read_and_report_foddata(struct fts_ts_data *data)
 {
 	u8 buf[10] = { 0 };
@@ -873,7 +860,6 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 		return 0;
 	}
 }
-#endif
 
 /*****************************************************************************
 *  Name: fts_read_touchdata
@@ -894,8 +880,6 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 	struct i2c_client *client = data->client;
 	u8 reg_value;
 
-#if FTS_GESTURE_EN
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	if (fts_read_and_report_foddata(data) == 0) {
 		FTS_INFO("succuss to get gesture data in irq handler");
 		ret = fts_i2c_read_reg(fts_data->client, FTS_REG_INT_ACK, &reg_value);
@@ -904,13 +888,6 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 		else
 			return 1;
 	}
-#else
-	if (0 == fts_gesture_readdata(data)) {
-		FTS_INFO("succuss to get gesture data in irq handler");
-		return 1;
-	}
-#endif
-#endif
 
 	data->point_num = 0;
 	data->touch_point = 0;
@@ -1095,12 +1072,11 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 #if FTS_REPORT_PRESSURE_EN
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
 #endif
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	input_set_capability(input_dev, EV_KEY, KEY_GOTO);
 	input_set_capability(input_dev, EV_KEY, BTN_INFO);
 	input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, pdata->x_min, pdata->x_max - 1, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_WIDTH_MINOR, pdata->x_min, pdata->x_max - 1, 0, 0);
-#endif
+
 	point_num = pdata->max_touch_number;
 	ts_data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;
 	ts_data->point_buf = (u8 *) kzalloc(ts_data->pnt_buf_size, GFP_KERNEL);
@@ -1784,16 +1760,13 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	spin_lock_init(&ts_data->irq_lock);
 	mutex_init(&ts_data->report_mutex);
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	mutex_init(&ts_data->fod_mutex);
-#endif
 
 	ret = fts_input_init(ts_data);
 	if (ret) {
 		FTS_ERROR("fts input initialize fail");
 		goto err_input_init;
 	}
-#ifdef FTS_POWER_SOURCE_CUST_EN
 	ret = fts_power_source_init(ts_data);
 	if (ret) {
 		FTS_ERROR("fail to get vdd/vcc_i2c regulator");
@@ -1806,13 +1779,10 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		FTS_ERROR("fail to enable vdd/vcc_i2c regulator");
 		goto err_power_ctrl;
 	}
-#if FTS_PINCTRL_EN
 	ret = fts_pinctrl_init(ts_data);
 	if (0 == ret) {
 		fts_pinctrl_select_normal(ts_data);
 	}
-#endif
-#endif
 
 	ret = fts_gpio_configure(ts_data);
 	if (ret) {
@@ -1876,13 +1846,12 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		FTS_ERROR("init glove/cover/charger fail");
 		goto err_debugfs_create;
 	}
-#if FTS_GESTURE_EN
+
 	ret = fts_gesture_init(ts_data);
 	if (ret) {
 		FTS_ERROR("init gesture fail");
 		goto err_debugfs_create;
 	}
-#endif
 
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
 	/*
@@ -1952,12 +1921,10 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 			dev_set_drvdata(ts_data->fts_touch_dev, ts_data);
 		}
 	}
-#if FTS_AUTO_UPGRADE_EN
 	ret = fts_fwupg_init(ts_data);
 	if (ret) {
 		FTS_ERROR("init fw upgrade fail");
 	}
-#endif
 
 	FTS_FUNC_EXIT();
 	return 0;
@@ -1983,15 +1950,11 @@ err_irq_req:
 	if (gpio_is_valid(pdata->irq_gpio))
 		gpio_free(pdata->irq_gpio);
 err_gpio_config:
-#ifdef FTS_POWER_SOURCE_CUST_EN
-#if FTS_PINCTRL_EN
 	fts_pinctrl_select_release(ts_data);
-#endif
 	fts_power_source_ctrl(ts_data, DISABLE);
 err_power_ctrl:
 	fts_power_source_release(ts_data);
 err_power_init:
-#endif
 	kfree_safe(ts_data->point_buf);
 	kfree_safe(ts_data->events);
 	input_unregister_device(ts_data->input_dev);
@@ -2034,10 +1997,7 @@ static int fts_ts_remove(struct i2c_client *client)
 	destroy_workqueue(ts_data->ts_wait_i2c_wq);
 #endif
 	fts_ex_mode_exit(client);
-
-#if FTS_AUTO_UPGRADE_EN
 	fts_fwupg_exit(ts_data);
-#endif
 
 	backlight_unregister_notifier(&ts_data->bl_notif);
 	power_supply_unreg_notifier(&ts_data->power_supply_notifier);
@@ -2058,13 +2018,9 @@ static int fts_ts_remove(struct i2c_client *client)
 	if (ts_data->ts_workqueue)
 		destroy_workqueue(ts_data->ts_workqueue);
 
-#ifdef FTS_POWER_SOURCE_CUST_EN
-#if FTS_PINCTRL_EN
 	fts_pinctrl_select_release(ts_data);
-#endif
 	fts_power_source_ctrl(ts_data, DISABLE);
 	fts_power_source_release(ts_data);
-#endif
 
 	kfree_safe(ts_data->point_buf);
 	kfree_safe(ts_data->events);
@@ -2120,21 +2076,17 @@ static int fts_ts_suspend(struct device *dev)
 		FTS_INFO("fw upgrade in process, can't suspend");
 		return 0;
 	}
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	mutex_lock(&ts_data->fod_mutex);
-#endif
 	fts_irq_disable_sync();
 
 	ts_data->fod_point_released = false;
 
-#if FTS_GESTURE_EN
 	if (fts_gesture_suspend(ts_data->client) == 0) {
 		ts_data->suspended = true;
 		fts_irq_enable();
 		goto release_finger;
 	}
-#endif
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 	ret = fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);
 	if (ret < 0) {
 		FTS_ERROR("%s fts_fod_reg_write failed, enter sleep mode!\n", __func__);
@@ -2151,11 +2103,8 @@ static int fts_ts_suspend(struct device *dev)
 	fts_irq_enable();
 	ts_data->suspended = true;
 	goto release_finger;
-#endif
 sleep_mode:
-#if FTS_PINCTRL_EN
 	fts_pinctrl_select_suspend(ts_data);
-#endif
 	/* TP enter sleep mode */
 	ret = fts_i2c_write_reg(ts_data->client, FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP_VALUE);
 	if (ret < 0)
@@ -2165,9 +2114,7 @@ release_finger:
 	mutex_lock(&fts_data->report_mutex);
 	fts_release_all_finger();
 	mutex_unlock(&fts_data->report_mutex);
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	mutex_unlock(&ts_data->fod_mutex);
-#endif
 	FTS_FUNC_EXIT();
 	return 0;
 }
@@ -2188,40 +2135,30 @@ static int fts_ts_resume(struct device *dev)
 		FTS_DEBUG("Already in awake state");
 		return 0;
 	}
-#if FTS_PINCTRL_EN
 	fts_pinctrl_select_normal(ts_data);
-#endif
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	FTS_INFO("%s finger_in_fod:%d\n", __func__, ts_data->finger_in_fod);
 	if (ts_data->pdata->reset_when_resume && !ts_data->finger_in_fod) {
-#else
-	if (ts_data->pdata->reset_when_resume) {
-#endif
 		FTS_INFO("reset when resume");
 		fts_reset_proc(200);
 		mutex_lock(&fts_data->report_mutex);
 		fts_release_all_finger();
 		mutex_unlock(&fts_data->report_mutex);
 	}
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	if (fts_data->finger_in_fod) {
 		fts_data->finger_in_fod = false;
 		fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_NO_CAL, true);
 	}
-#endif
 #ifdef CONFIG_I2C_STATUS_FOR_TOUCH
 	ts_data->IRQ_skipped = false;
 #endif
 	fts_tp_state_recovery(ts_data->client);
-#if FTS_GESTURE_EN
+
 	if (fts_gesture_resume(ts_data->client) == 0) {
 		ts_data->suspended = false;
 		return 0;
 	}
-#endif
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 	fts_gesture_reg_write(ts_data->client, FTS_REG_GESTURE_DOUBLETAP_ON, false);
-#endif
 	ts_data->suspended = false;
 	fts_irq_enable();
 	FTS_FUNC_EXIT();
@@ -2234,16 +2171,9 @@ static int fts_pm_suspend(struct device *dev)
 	int ret = 0;
 	ts_data->dev_pm_suspend = true;
 
-#ifndef CONFIG_TOUCHSCREEN_FTS_FOD
-	if (ts_data->lpwg_mode) {
-#endif
-		ret = enable_irq_wake(ts_data->irq);
-		if (ret) {
-			FTS_INFO("enable_irq_wake(irq:%d) failed", ts_data->irq);
-		}
-#ifndef CONFIG_TOUCHSCREEN_FTS_FOD
-	}
-#endif
+	ret = enable_irq_wake(ts_data->irq);
+	if (ret)
+		FTS_INFO("enable_irq_wake(irq:%d) failed", ts_data->irq);
 
 	return ret;
 }
@@ -2255,16 +2185,9 @@ static int fts_pm_resume(struct device *dev)
 
 	ts_data->dev_pm_suspend = false;
 
-#ifndef CONFIG_TOUCHSCREEN_FTS_FOD
-	if (ts_data->lpwg_mode) {
-#endif
-		ret = disable_irq_wake(ts_data->irq);
-		if (ret) {
-			FTS_INFO("disable_irq_wake(irq:%d) failed", ts_data->irq);
-		}
-#ifndef CONFIG_TOUCHSCREEN_FTS_FOD
-	}
-#endif
+	ret = disable_irq_wake(ts_data->irq);
+	if (ret)
+		FTS_INFO("disable_irq_wake(irq:%d) failed", ts_data->irq);
 
 	return 0;
 }

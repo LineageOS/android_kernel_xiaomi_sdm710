@@ -11,14 +11,6 @@ config TOUCHSCREEN_FTS_MI
 	  Say Y here if you have Focaltech touch panel.
 	  If unsure, say N.
 
-config TOUCHSCREEN_FTS_FOD
-        bool "Focaltech Touchscreen Fod func"
-	depends on TOUCHSCREEN_FTS_MI
-	default n
-	help
-	 Say Y here if you support fod function.
-	 If unsure, say N.
-
 config TOUCHSCREEN_FTS_MI_DIRECTORY
 	string "Focaltech ts directory name"
 	default "focaltech_touch_mi"

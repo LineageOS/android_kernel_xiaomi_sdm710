@@ -110,44 +110,15 @@
 #define FTS_REPORT_PRESSURE_EN                  0
 
 /*
- * Gesture function enable
- * default: disable
- */
-#define FTS_GESTURE_EN                          1
-
-/*
- * Charger enable
- * 1: enable, 0:disable(default)
- */
-#define FTS_CHARGER_EN                          1
-
-/*
  * Nodes for tools, please keep enable
  */
 #define FTS_SYSFS_NODE_EN                       1
 #define FTS_APK_NODE_EN                         1
 
-/*
- * Pinctrl enable
- * default: disable
- */
-#define FTS_PINCTRL_EN                          1
-
-/*
- * Customer power enable
- * enable it when customer need control TP power
- * default: disable
- */
-#define FTS_POWER_SOURCE_CUST_EN
 
 /****************************************************/
 
 /********************** Upgrade ****************************/
-/*
- * auto upgrade, please keep enable
- */
-#define FTS_AUTO_UPGRADE_EN                     1
-
 /*
  * Check vendor_id number
  * 0:No check vendor_id (default)

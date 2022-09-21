@@ -1367,7 +1367,6 @@ int fts_fwupg_upgrade(struct i2c_client *client, struct fts_upgrade *upg)
 	return ret;
 }
 
-#if FTS_AUTO_UPGRADE_EN
 /************************************************************************
  * fts_fwupg_auto_upgrade - upgrade main entry
  ***********************************************************************/
@@ -1531,9 +1530,7 @@ static void fts_fwupg_work(struct work_struct *work)
 		fts_fwupg_auto_upgrade(ts_data);
 	}
 
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	fts_fod_recovery(ts_data->client);
-#endif
 	fts_irq_enable();
 	ts_data->fw_loading = 0;
 }
@@ -1647,5 +1644,3 @@ int fts_fwupg_exit(struct fts_ts_data *ts_data)
 
 	return 0;
 }
-
-#endif /* #if FTS_AUTO_UPGRADE_EN */

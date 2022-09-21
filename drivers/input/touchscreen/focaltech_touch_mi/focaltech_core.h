@@ -167,9 +167,7 @@ struct fts_ts_data {
 	  *when fod unlock, release all points to avoid lose point up_action
 	  */
 	bool fod_point_released;
-#ifdef FTS_POWER_SOURCE_CUST_EN
 	bool power_disabled;
-#endif
 	/* multi-touch */
 	struct ts_event *events;
 	u8 *point_buf;
@@ -192,12 +190,10 @@ struct fts_ts_data {
 	struct work_struct suspend_work;
 	struct work_struct resume_work;
 	struct workqueue_struct *event_wq;
-#if FTS_PINCTRL_EN
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pins_active;
 	struct pinctrl_state *pins_suspend;
 	struct pinctrl_state *pins_release;
-#endif
 #ifdef CONFIG_DRM
 	struct notifier_block fb_notif;
 #endif
@@ -211,14 +207,12 @@ struct fts_ts_data {
 	struct notifier_block bl_notif;
 	struct work_struct power_supply_work;
 	int is_usb_exist;
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 	bool finger_in_fod;
 	bool fod_finger_skip;
 	int fod_x;
 	int fod_y;
 	int overlap_area;
 	struct mutex fod_mutex;
-#endif
 	struct class *fts_tp_class;
 	struct device *fts_touch_dev;
 	bool is_tp_testing;
@@ -240,7 +234,6 @@ int fts_i2c_init(void);
 int fts_i2c_exit(void);
 
 /* Gesture functions */
-#if FTS_GESTURE_EN
 int fts_gesture_init(struct fts_ts_data *ts_data);
 int fts_gesture_exit(struct i2c_client *client);
 void fts_gesture_recovery(struct i2c_client *client);
@@ -248,11 +241,8 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data);
 int fts_gesture_suspend(struct i2c_client *i2c_client);
 int fts_gesture_resume(struct i2c_client *client);
 int fts_gesture_reg_write(struct i2c_client *client, u8 mask, bool enable);
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 int fts_fod_reg_write(struct i2c_client *client, u8 mask, bool enable);
 void fts_fod_recovery(struct i2c_client *client);
-#endif
-#endif
 
 /* Apk and functions */
 #if FTS_APK_NODE_EN

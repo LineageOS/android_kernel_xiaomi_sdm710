@@ -34,7 +34,7 @@
 *****************************************************************************/
 #include "focaltech_core.h"
 #include <linux/input/tp_common.h>
-#if FTS_GESTURE_EN
+
 /******************************************************************************
 * Private constant and macro definitions using #define
 *****************************************************************************/
@@ -470,13 +470,11 @@ void fts_gesture_recovery(struct i2c_client *client)
 		fts_i2c_write_reg(client, 0xD7, 0xff);
 		fts_i2c_write_reg(client, 0xD8, 0xff);
 		fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 		fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
-#endif
 	}
 }
 
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
 void fts_fod_recovery(struct i2c_client *client)
 {
 	FTS_FUNC_ENTER();
@@ -514,7 +512,6 @@ int fts_fod_reg_write(struct i2c_client *client, u8 mask, bool enable)
 		return 0;
 	}
 }
-#endif
 
 int fts_gesture_reg_write(struct i2c_client *client, u8 mask, bool enable)
 {
@@ -567,14 +564,14 @@ int fts_gesture_suspend(struct i2c_client *client)
 		fts_gesture_data.active = DISABLE;
 		return -EIO;
 	}
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 	ret = fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
 	if (ret) {
 		FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
 		fts_gesture_data.active = DISABLE;
 		return -EIO;
 	}
-#endif
+
 	fts_gesture_data.active = ENABLE;
 	FTS_INFO("[GESTURE]Enter into gesture(suspend) successfully!");
 	FTS_FUNC_EXIT();
@@ -608,13 +605,12 @@ int fts_gesture_resume(struct i2c_client *client)
 		FTS_ERROR("[GESTURE]Resume from gesture failed!\n");
 		return -EIO;
 	}
-#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+
 	ret = fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, false);
 	if (ret) {
 		FTS_ERROR("[GESTURE]resume from gesture(suspend) failed!\n");
 		return -EIO;
 	}
-#endif
 
 	fts_gesture_data.active = DISABLE;
 	msleep(10);
@@ -697,4 +693,3 @@ int fts_gesture_exit(struct i2c_client *client)
 	FTS_FUNC_EXIT();
 	return 0;
 }
-#endif

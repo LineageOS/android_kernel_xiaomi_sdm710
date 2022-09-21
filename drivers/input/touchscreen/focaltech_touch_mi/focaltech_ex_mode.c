@@ -59,8 +59,6 @@ static int fts_enter_charger_mode(struct i2c_client *client, int mode);
 /*****************************************************************************
 * 6.Static function prototypes
 *******************************************************************************/
-
-#if FTS_CHARGER_EN
 static ssize_t fts_touch_charger_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int count;
@@ -154,13 +152,8 @@ static int fts_enter_charger_mode(struct i2c_client *client, int mode)
 */
 static DEVICE_ATTR(fts_charger_mode, S_IRUGO | S_IWUSR, fts_touch_charger_show, fts_touch_charger_store);
 
-#endif
-
 static struct attribute *fts_touch_mode_attrs[] = {
-#if FTS_CHARGER_EN
 	&dev_attr_fts_charger_mode.attr,
-#endif
-
 	NULL,
 };
 
@@ -197,12 +190,10 @@ int fts_ex_mode_recovery(struct i2c_client *client)
 {
 	int ret = 0;
 
-#if FTS_CHARGER_EN
 	if (g_fts_mode_flag.fts_charger_mode_flag) {
 		FTS_INFO("[Mode]restore charger mode");
 		ret = fts_enter_charger_mode(client, true);
 	}
-#endif
 
 	return ret;
 }
