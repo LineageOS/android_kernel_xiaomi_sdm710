@@ -101,7 +101,6 @@
 #define TOUCH_IN_KEY(x, key_x)              TOUCH_IN_RANGE(x, key_x, FTS_KEY_WIDTH)
 
 #define FTS_LOCKDOWN_INFO_SIZE				8
-#define DRM_ADD_COMPLETE
 
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef

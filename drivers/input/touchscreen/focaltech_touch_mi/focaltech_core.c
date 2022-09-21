@@ -32,7 +32,7 @@
 * Included header files
 *****************************************************************************/
 #include "focaltech_core.h"
-#if defined(CONFIG_DRM) && defined(DRM_ADD_COMPLETE)
+#if defined(CONFIG_DRM)
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #include <linux/msm_drm_notify.h>
@@ -1608,7 +1608,7 @@ static int fts_bl_state_chg_callback(struct notifier_block *nb,
 }
 
 
-#if defined(CONFIG_DRM) && defined(DRM_ADD_COMPLETE)
+#if defined(CONFIG_DRM)
 /*****************************************************************************
 *  Name: fb_notifier_callback
 *  Brief:
@@ -1890,7 +1890,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	device_init_wakeup(&client->dev, 1);
 	ts_data->dev_pm_suspend = false;
 
-#if  defined(CONFIG_DRM) && defined(DRM_ADD_COMPLETE)
+#if  defined(CONFIG_DRM)
 	ts_data->fb_notif.notifier_call = fb_notifier_callback;
 	ret = msm_drm_register_client(&ts_data->fb_notif);
 	if (ret) {
@@ -2001,7 +2001,7 @@ static int fts_ts_remove(struct i2c_client *client)
 
 	backlight_unregister_notifier(&ts_data->bl_notif);
 	power_supply_unreg_notifier(&ts_data->power_supply_notifier);
-#if defined(CONFIG_DRM) && defined(DRM_ADD_COMPLETE)
+#if defined(CONFIG_DRM)
 	if (msm_drm_unregister_client(&ts_data->fb_notif))
 		FTS_ERROR("Error occurred while unregistering fb_notifier.");
 #endif
