@@ -172,23 +172,6 @@ static ssize_t fts_gesture_store(struct device *dev, struct device_attribute *at
 	return count;
 }
 
-void fts_gesture_enable(bool enable)
-{
-	struct input_dev *input_dev = fts_data->input_dev;
-
-	mutex_lock(&input_dev->mutex);
-
-	if (enable) {
-		FTS_INFO("[GESTURE]enable gesture");
-		fts_gesture_data.mode = ENABLE;
-	} else {
-		FTS_INFO("[GESTURE]disable gesture");
-		fts_gesture_data.mode = DISABLE;
-	}
-
-	mutex_unlock(&input_dev->mutex);
-}
-
 /************************************************************************
 * Name: fts_gesture_buf_show
 *  Brief:

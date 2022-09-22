@@ -242,7 +242,6 @@ void fts_irq_enable(void);
 
 int fts_flash_read(struct i2c_client *client, u32 addr, u8 *buf, u32 len);
 int fts_flash_read_buf(struct i2c_client *client, u32 saddr, u8 *buf, u32 len);
-void fts_gesture_enable(bool enable);
 struct device *fts_get_dev(void);
 
 
