@@ -2393,24 +2393,22 @@ static int fts_ts_suspend(struct device *dev)
 	}
 #endif
 #ifdef CONFIG_TOUCHSCREEN_FTS_FOD
-	if (ts_data->aod_status) {
-		ret = fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);
-		if (ret < 0) {
-			FTS_ERROR("%s fts_fod_reg_write failed, enter sleep mode!\n", __func__);
-			goto sleep_mode;
-		}
-
-		fts_gesture_reg_write(ts_data->client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
-		if (ret < 0) {
-			FTS_ERROR("%s fts_gesture_reg_write failed, enter sleep mode!\n", __func__);
-			goto sleep_mode;
-		}
-
-		fts_ts_clear_buffer();
-		fts_irq_enable();
-		ts_data->suspended = true;
-		goto release_finger;
+	ret = fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, true);
+	if (ret < 0) {
+		FTS_ERROR("%s fts_fod_reg_write failed, enter sleep mode!\n", __func__);
+		goto sleep_mode;
 	}
+
+	fts_gesture_reg_write(ts_data->client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
+	if (ret < 0) {
+		FTS_ERROR("%s fts_gesture_reg_write failed, enter sleep mode!\n", __func__);
+		goto sleep_mode;
+	}
+
+	fts_ts_clear_buffer();
+	fts_irq_enable();
+	ts_data->suspended = true;
+	goto release_finger;
 #endif
 sleep_mode:
 #endif
