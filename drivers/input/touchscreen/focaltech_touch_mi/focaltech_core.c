@@ -1488,7 +1488,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err_sysfs_create_group;
 	}
 
-	ret = fts_gesture_init(ts_data);
+	ret = fts_fod_gesture_init(ts_data);
 	if (ret) {
 		FTS_ERROR("init gesture fail");
 		goto err_sysfs_create_group;
