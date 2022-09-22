@@ -185,6 +185,40 @@ int fts_i2c_read_reg(struct i2c_client *client, u8 regaddr, u8 *regvalue)
 	return fts_i2c_read(client, &regaddr, 1, regvalue, 1);
 }
 
+int fts_i2c_update_reg(struct i2c_client *client, u8 addr, u8 mask, bool on)
+{
+	u8 value, temp;
+	int ret;
+
+	/* Read current register value */
+	ret = fts_i2c_read_reg(client, addr, &value);
+	if (ret < 0)
+		return ret;
+
+	/* Set/clear bits specified by mask */
+	temp = on ? (value | mask) : (value & ~mask);
+	if (temp == value)
+		return 0; /* No change */
+
+	/* Write new value */
+	ret = fts_i2c_write_reg(client, addr, temp);
+	if (ret < 0)
+		return ret;
+
+	msleep(1);
+
+	/* Re-read register */
+	ret = fts_i2c_read_reg(client, addr, &value);
+	if (ret < 0)
+		return ret;
+
+	/* Return -EAGAIN if register value was not updated */
+	if (value != temp)
+		ret = -EAGAIN;
+
+	return ret;
+}
+
 /************************************************************************
 * HID to standard I2C
 ***********************************************************************/

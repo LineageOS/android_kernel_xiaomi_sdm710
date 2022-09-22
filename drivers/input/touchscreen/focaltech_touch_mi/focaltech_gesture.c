@@ -131,58 +131,42 @@ void fts_fod_recovery(struct i2c_client *client)
 
 int fts_fod_reg_write(struct i2c_client *client, u8 mask, bool enable)
 {
-	int i;
-	u8 state;
-	u8 reg_value;
+	int i, ret;
 
 	for (i = 0; i < 5; i++) {
-		fts_i2c_read_reg(client, FTS_REG_GESTURE_SUPPORT, &reg_value);
-		if (enable)
-			reg_value |= mask;
-		else
-			reg_value &= ~mask;
-		fts_i2c_write_reg(client, FTS_REG_GESTURE_SUPPORT, reg_value);
-		msleep(1);
-		fts_i2c_read_reg(client, FTS_REG_GESTURE_SUPPORT, &state);
-		if (state == reg_value)
+		ret = fts_i2c_update_reg(client, FTS_REG_GESTURE_SUPPORT,
+					 mask, enable);
+		if (ret != -EAGAIN)
 			break;
+		msleep(1);
 	}
 
-	if (i >= 5) {
-		FTS_ERROR("[GESTURE]Write fod reg failed!\n");
-		return -EIO;
-	} else {
-		FTS_ERROR("[GESTURE]Write fod reg success!\n");
-		return 0;
+	if (ret < 0) {
+		FTS_ERROR("Failed to update fod reg\n");
+		ret = -EIO;
 	}
+
+	return ret;
 }
 
 int fts_gesture_reg_write(struct i2c_client *client, u8 mask, bool enable)
 {
-	int i;
-	u8 state;
-	u8 reg_value;
+	int i, ret;
 
 	for (i = 0; i < 5; i++) {
-		fts_i2c_read_reg(client, FTS_REG_GESTURE_EN, &reg_value);
-		if (enable)
-			reg_value |= mask;
-		else
-			reg_value &= ~mask;
-		fts_i2c_write_reg(client, FTS_REG_GESTURE_EN, reg_value);
-		msleep(1);
-		fts_i2c_read_reg(client, FTS_REG_GESTURE_EN, &state);
-		if (state == reg_value)
+		ret = fts_i2c_update_reg(client, FTS_REG_GESTURE_EN, mask,
+					 enable);
+		if (ret != -EAGAIN)
 			break;
+		msleep(1);
 	}
 
-	if (i >= 5) {
-		FTS_ERROR("[GESTURE]Write gesture reg failed!\n");
-		return -EIO;
-	} else {
-		FTS_ERROR("[GESTURE]Write gesture reg success!\n");
-		return 0;
-	}
+	if (ret < 0) {
+                FTS_ERROR("Failed to update gesture reg\n");
+		ret = -EIO;
+        }
+
+	return ret;
 }
 
 /*****************************************************************************

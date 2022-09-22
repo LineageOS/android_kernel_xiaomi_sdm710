@@ -203,6 +203,7 @@ extern struct fts_ts_data *fts_data;
 /* i2c communication*/
 int fts_i2c_write_reg(struct i2c_client *client, u8 regaddr, u8 regvalue);
 int fts_i2c_read_reg(struct i2c_client *client, u8 regaddr, u8 *regvalue);
+int fts_i2c_update_reg(struct i2c_client *client, u8 addr, u8 mask, bool on);
 int fts_i2c_read(struct i2c_client *client, char *writebuf, int writelen, char *readbuf, int readlen);
 int fts_i2c_write(struct i2c_client *client, char *writebuf, int writelen);
 void fts_i2c_hid2std(struct i2c_client *client);
