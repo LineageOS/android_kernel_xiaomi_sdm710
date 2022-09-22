@@ -214,13 +214,12 @@ int fts_i2c_exit(void);
 /* FOD & Gesture functions */
 int fts_features_set(struct i2c_client *client, u8 features_mask, bool enable);
 int fts_fod_gesture_readdata(struct fts_ts_data *ts_data);
-void fts_fod_recovery(struct i2c_client *client);
+int fts_fod_gesture_resume(struct i2c_client *client);
+int fts_fod_gesture_suspend(struct i2c_client *i2c_client);
+void fts_fod_gesture_recovery(struct i2c_client *client);
 int fts_gesture_init(struct fts_ts_data *ts_data);
 int fts_gesture_exit(struct i2c_client *client);
 int fts_gesture_mode_set(struct i2c_client *client, bool enable);
-void fts_gesture_recovery(struct i2c_client *client);
-int fts_gesture_suspend(struct i2c_client *i2c_client);
-int fts_gesture_resume(struct i2c_client *client);
 
 /* ADB functions */
 int fts_create_sysfs(struct i2c_client *client);

@@ -60,7 +60,6 @@ extern int fts_charger_mode_set(struct i2c_client *client, bool on);
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
-static int fts_ts_clear_buffer(void);
 static void fts_release_all_finger(void);
 static int fts_ts_suspend(struct device *dev);
 static int fts_ts_resume(struct device *dev);
@@ -232,8 +231,8 @@ void fts_tp_state_recovery(struct i2c_client *client)
 	/* recover TP glove state 0xC0 */
 	/* recover TP cover state 0xC1 */
 	fts_ex_mode_recovery(client);
-	/* recover TP gesture state 0xD0 */
-	fts_gesture_recovery(client);
+	/* recover TP fod/gesture state 0xCF & 0xD0 */
+	fts_fod_gesture_recovery(client);
 	FTS_FUNC_EXIT();
 }
 
@@ -253,8 +252,6 @@ int fts_reset_proc(int hdelayms)
 	if (hdelayms) {
 		msleep(hdelayms);
 	}
-
-	fts_fod_recovery(fts_data->client);
 
 	FTS_FUNC_EXIT();
 	return 0;
@@ -1628,28 +1625,6 @@ static int fts_ts_remove(struct i2c_client *client)
 	return 0;
 }
 
-/*****************************************************************************
-* Name: fts_ts_clear_buffer
-* Brief: during irq disabled, FTS_REG_INT_ACK(0x3E) register will store three frames
-* touchevent data. This register need to be cleared in case some points lost Tracking ID
-* Input:
-* Output:
-* Return:
-*****************************************************************************/
-static int fts_ts_clear_buffer(void)
-{
-	int ret = 0;
-	int retry = 0;
-	u8 reg_value;
-	for (retry = 0; retry < 3; retry++) {
-		ret = fts_i2c_read_reg(fts_data->client, FTS_REG_INT_ACK, &reg_value);
-		if (ret < 0) {
-			FTS_ERROR("Read int ack error, retry %d", retry);
-			break;
-		}
-	}
-	return ret;
-}
 
 /*****************************************************************************
 *  Name: fts_ts_suspend
@@ -1663,7 +1638,6 @@ static int fts_ts_suspend(struct device *dev)
 	int ret = 0;
 	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 
-	FTS_FUNC_ENTER();
 	if (ts_data->suspended) {
 		FTS_INFO("Already in suspend state");
 		return 0;
@@ -1673,45 +1647,29 @@ static int fts_ts_suspend(struct device *dev)
 		FTS_INFO("fw upgrade in process, can't suspend");
 		return 0;
 	}
+
 	fts_irq_disable_sync();
 
-	ts_data->fod_point_released = false;
-
-	if (fts_gesture_suspend(ts_data->client) == 0) {
-		ts_data->suspended = true;
+	if (fts_fod_gesture_suspend(ts_data->client) == 0) {
+		/* Enable IRQ during gesture mode */
 		fts_irq_enable();
-		goto release_finger;
+	} else {
+		/* Gesture mode entering failure, go to sleep mode */
+
+		fts_pinctrl_select_suspend(ts_data);
+		/* TP enter sleep mode */
+		ret = fts_i2c_write_reg(ts_data->client, FTS_REG_POWER_MODE,
+					FTS_REG_POWER_MODE_SLEEP_VALUE);
+		if (ret < 0)
+			FTS_ERROR("Failed to set sleep mode: %d", ret);
 	}
 
-	ret = fts_features_set(ts_data->client, FTS_REG_FEATURES_FOD,
-			       true);
-	if (ret < 0) {
-		FTS_ERROR("%s fts_fod_reg_write failed, enter sleep mode!\n", __func__);
-		goto sleep_mode;
-	}
-
-	ret = fts_gesture_mode_set(ts_data->client, true);
-	if (ret < 0) {
-		FTS_ERROR("Failed to set gesture mode, enter sleep mode\n");
-		goto sleep_mode;
-	}
-
-	fts_ts_clear_buffer();
-	fts_irq_enable();
 	ts_data->suspended = true;
-	goto release_finger;
-sleep_mode:
-	fts_pinctrl_select_suspend(ts_data);
-	/* TP enter sleep mode */
-	ret = fts_i2c_write_reg(ts_data->client, FTS_REG_POWER_MODE, FTS_REG_POWER_MODE_SLEEP_VALUE);
-	if (ret < 0)
-		FTS_ERROR("set TP to sleep mode fail, ret=%d", ret);
-	ts_data->suspended = true;
-release_finger:
+
 	mutex_lock(&fts_data->report_mutex);
 	fts_release_all_finger();
 	mutex_unlock(&fts_data->report_mutex);
-	FTS_FUNC_EXIT();
+
 	return 0;
 }
 
@@ -1726,37 +1684,31 @@ static int fts_ts_resume(struct device *dev)
 {
 	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 
-	FTS_FUNC_ENTER();
 	if (!ts_data->suspended) {
 		FTS_DEBUG("Already in awake state");
 		return 0;
 	}
+
 	fts_pinctrl_select_normal(ts_data);
-	FTS_INFO("%s finger_in_fod:%d\n", __func__, ts_data->finger_in_fod);
+
 	if (ts_data->pdata->reset_when_resume && !ts_data->finger_in_fod) {
 		FTS_INFO("reset when resume");
 		fts_reset_proc(200);
+
 		mutex_lock(&fts_data->report_mutex);
 		fts_release_all_finger();
 		mutex_unlock(&fts_data->report_mutex);
 	}
-	if (fts_data->finger_in_fod) {
-		fts_data->finger_in_fod = false;
-		fts_features_set(ts_data->client, FTS_REG_FEATURES_FOD_NO_CAL,
-				 true);
-	}
 
 	fts_tp_state_recovery(ts_data->client);
 
-	if (fts_gesture_resume(ts_data->client) == 0) {
-		ts_data->suspended = false;
-		return 0;
-	}
-
-	fts_gesture_mode_set(ts_data->client, false);
 	ts_data->suspended = false;
+
+	if (fts_fod_gesture_resume(ts_data->client) == 0)
+		return 0;
+
 	fts_irq_enable();
-	FTS_FUNC_EXIT();
+
 	return 0;
 }
 

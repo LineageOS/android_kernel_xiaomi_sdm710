@@ -1487,7 +1487,7 @@ static void fts_fwupg_work(struct work_struct *work)
 		fts_fwupg_auto_upgrade(ts_data);
 	}
 
-	fts_fod_recovery(ts_data->client);
+	fts_fod_gesture_recovery(ts_data->client);
 	fts_irq_enable();
 	ts_data->fw_loading = 0;
 }

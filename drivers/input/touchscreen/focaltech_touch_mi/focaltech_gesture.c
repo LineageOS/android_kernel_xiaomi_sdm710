@@ -80,38 +80,6 @@ static struct tp_common_ops double_tap_ops = {
 	.store = double_tap_store,
 };
 
-/*****************************************************************************
-*   Name: fts_gesture_recovery
-*  Brief: recovery gesture state when reset or power on
-*  Input:
-* Output:
-* Return:
-*****************************************************************************/
-void fts_gesture_recovery(struct i2c_client *client)
-{
-	if (fts_data->double_tap && fts_data->suspended) {
-		fts_i2c_write_reg(client, 0xD1, 0xff);
-		fts_i2c_write_reg(client, 0xD2, 0xff);
-		fts_i2c_write_reg(client, 0xD5, 0xff);
-		fts_i2c_write_reg(client, 0xD6, 0xff);
-		fts_i2c_write_reg(client, 0xD7, 0xff);
-		fts_i2c_write_reg(client, 0xD8, 0xff);
-		fts_gesture_mode_set(client, true);
-
-		fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, true);
-	}
-}
-
-void fts_fod_recovery(struct i2c_client *client)
-{
-	FTS_FUNC_ENTER();
-	if (fts_data->suspended) {
-		FTS_INFO("%s, tp is in suspend mode, write 0xd0 to 1", __func__);
-		fts_gesture_mode_set(client, true);
-	}
-	fts_features_set(client, FTS_REG_FEATURES_FOD, true);
-}
-
 int fts_features_set(struct i2c_client *client, u8 features_mask, bool enable)
 {
 	int i, ret;
@@ -159,66 +127,6 @@ int fts_gesture_mode_set(struct i2c_client *client, bool enable)
 * Output:
 * Return: return 0 if succuss, otherwise return error code
 *****************************************************************************/
-int fts_gesture_suspend(struct i2c_client *client)
-{
-	int ret;
-
-	if (!fts_data->double_tap) {
-		FTS_INFO("Double-tap is disabled");
-		return -EINVAL;
-	}
-
-	ret = fts_gesture_mode_set(client, true);
-	if (ret) {
-		FTS_ERROR("Failed to set gesture mode: %d", ret);
-		return -EIO;
-	}
-
-	ret = fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, true);
-	if (ret) {
-		FTS_ERROR("Failed to enable double-tap feature");
-		return -EIO;
-	}
-
-	FTS_INFO("Successfully entered gesture mode");
-
-	return 0;
-}
-
-/*****************************************************************************
-*   Name: fts_gesture_resume
-*  Brief:
-*  Input:
-* Output:
-* Return: return 0 if succuss, otherwise return error code
-*****************************************************************************/
-int fts_gesture_resume(struct i2c_client *client)
-{
-	int ret;
-
-	if (!fts_data->double_tap) {
-		FTS_INFO("Double-tap is disabled");
-		return -EINVAL;
-	}
-
-	ret = fts_gesture_mode_set(client, false);
-	if (ret) {
-		FTS_ERROR("Failed to leave gesture mode: %d", ret);
-		return -EIO;
-	}
-
-	ret = fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, false);
-	if (ret) {
-		FTS_ERROR("Failed to disable double-tap feature: %d", ret);
-		return -EIO;
-	}
-
-	msleep(10);
-	FTS_INFO("Successfully left gesture mode");
-
-	return 0;
-}
-
 /*****************************************************************************
 *   Name: fts_gesture_init
 *  Brief:

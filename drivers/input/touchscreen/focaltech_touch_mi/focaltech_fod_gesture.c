@@ -148,3 +148,111 @@ int fts_fod_gesture_readdata(struct fts_ts_data *ts_data)
 
 	return ret;
 }
+
+void fts_fod_gesture_recovery(struct i2c_client *client)
+{
+	u8 features = FTS_REG_FEATURES_FOD;
+	int ret;
+
+	if (fts_data->double_tap)
+		features |= FTS_REG_FEATURES_DOUBLETAP;
+
+	ret = fts_features_set(client, features, true);
+	if (ret < 0)
+		FTS_ERROR("Failed to update features");
+
+
+	if (fts_data->suspended) {
+		fts_i2c_write_reg(client, 0xD1, 0xff);
+		fts_i2c_write_reg(client, 0xD2, 0xff);
+		fts_i2c_write_reg(client, 0xD5, 0xff);
+		fts_i2c_write_reg(client, 0xD6, 0xff);
+		fts_i2c_write_reg(client, 0xD7, 0xff);
+		fts_i2c_write_reg(client, 0xD8, 0xff);
+
+		ret = fts_gesture_mode_set(client, true);
+		if (ret < 0)
+			FTS_ERROR("Failed to restore gesture mode");
+	}
+}
+
+/*
+ * During irq disabled, FTS_REG_INT_ACK(0x3E) register will store three frames
+ * touchevent data. This register need to be cleared in case some points lost
+ * Tracking ID
+ */
+static int fts_ts_clear_buffer(struct i2c_client *client)
+{
+	int i, ret;
+	u8 value;
+
+	for (i = 0; i < 3; i++) {
+		ret = fts_i2c_read_reg(client, FTS_REG_INT_ACK, &value);
+		if (ret < 0) {
+			FTS_ERROR("Failed to read INT ACK register");
+			break;
+		}
+	}
+
+	return ret;
+}
+
+int fts_fod_gesture_suspend(struct i2c_client *client)
+{
+	int ret;
+
+	fts_data->fod_point_released = false;
+
+	/* Enable/disable double-tap per request */
+	ret = fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP,
+			       fts_data->double_tap);
+	if (ret < 0)
+		FTS_ERROR("Failed to %s double-tap feature",
+			  fts_data->double_tap ? "enable" : "disable");
+
+	/* Always enable FOD sensor */
+	ret = fts_features_set(client, FTS_REG_FEATURES_FOD, true);
+	if (ret < 0)
+		FTS_ERROR("Failed to enable FOD sensor feature");
+
+	/* Enter gesture mode */
+	ret = fts_gesture_mode_set(client, true);
+	if (ret < 0) {
+		FTS_ERROR("Failed to enter gesture mode: %d", ret);
+		return -EIO;
+	}
+
+	fts_ts_clear_buffer(client);
+
+	FTS_INFO("Successfully entered gesture mode");
+
+	return 0;
+}
+
+int fts_fod_gesture_resume(struct i2c_client *client)
+{
+	int ret;
+
+	if (fts_data->finger_in_fod) {
+		fts_data->finger_in_fod = false;
+		fts_features_set(client, FTS_REG_FEATURES_FOD_NO_CAL, true);
+	}
+
+	/* Leave gesture mode */
+	ret = fts_gesture_mode_set(client, false);
+	if (ret < 0) {
+		FTS_ERROR("Failed to leave gesture mode: %d", ret);
+		return -EIO;
+	}
+
+	ret = fts_features_set(client, FTS_REG_FEATURES_DOUBLETAP, false);
+	if (ret < 0) {
+		FTS_ERROR("Failed to disable double-tap feature: %d", ret);
+		return -EIO;
+	}
+
+	msleep(10);
+	FTS_INFO("Successfully left gesture mode");
+
+	return 0;
+}
