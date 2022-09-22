@@ -38,8 +38,6 @@
 /******************************************************************************
 * Private constant and macro definitions using #define
 *****************************************************************************/
-#define FTS_GESTRUE_POINTS                      255
-#define FTS_GESTRUE_POINTS_HEADER               8
 
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef
@@ -56,9 +54,6 @@
 *                   0:gesture disable or resume
 */
 struct fts_gesture_st {
-	u8 header[FTS_GESTRUE_POINTS_HEADER];
-	u16 coordinate_x[FTS_GESTRUE_POINTS];
-	u16 coordinate_y[FTS_GESTRUE_POINTS];
 	u8 mode;		/*host driver enable gesture flag */
 	u8 active;		/*gesture actutally work */
 };
@@ -76,31 +71,6 @@ extern struct fts_ts_data *fts_data;
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
-static ssize_t fts_gesture_show(struct device *dev, struct device_attribute *attr, char *buf);
-static ssize_t fts_gesture_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
-static ssize_t fts_gesture_buf_show(struct device *dev, struct device_attribute *attr, char *buf);
-static ssize_t fts_gesture_buf_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
-
-/* sysfs gesture node
- *   read example: cat  fts_gesture_mode        ---read gesture mode
- *   write example:echo 01 > fts_gesture_mode   ---write gesture mode to 01
- *
- */
-static DEVICE_ATTR(fts_gesture_mode, S_IRUGO | S_IWUSR, fts_gesture_show, fts_gesture_store);
-/*
- *   read example: cat fts_gesture_buf        ---read gesture buf
- */
-static DEVICE_ATTR(fts_gesture_buf, S_IRUGO | S_IWUSR, fts_gesture_buf_show, fts_gesture_buf_store);
-static struct attribute *fts_gesture_mode_attrs[] = {
-	&dev_attr_fts_gesture_mode.attr,
-	&dev_attr_fts_gesture_buf.attr,
-	NULL,
-};
-
-static struct attribute_group fts_gesture_group = {
-	.attrs = fts_gesture_mode_attrs,
-};
-
 static ssize_t double_tap_show(struct kobject *kobj,
                                struct kobj_attribute *attr, char *buf)
 {
@@ -125,115 +95,6 @@ static struct tp_common_ops double_tap_ops = {
 	.show = double_tap_show,
 	.store = double_tap_store,
 };
-
-/************************************************************************
-* Name: fts_gesture_show
-*  Brief:
-*  Input: device, device attribute, char buf
-* Output:
-* Return:
-***********************************************************************/
-static ssize_t fts_gesture_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	int count;
-	u8 val;
-	struct input_dev *input_dev = fts_data->input_dev;
-	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-
-	mutex_lock(&input_dev->mutex);
-	fts_i2c_read_reg(client, FTS_REG_GESTURE_EN, &val);
-	count = snprintf(buf, PAGE_SIZE, "Gesture Mode: %s\n", fts_gesture_data.mode ? "On" : "Off");
-	count += snprintf(buf + count, PAGE_SIZE, "Reg(0xD0) = %d\n", val);
-	mutex_unlock(&input_dev->mutex);
-
-	return count;
-}
-
-/************************************************************************
-* Name: fts_gesture_store
-*  Brief:
-*  Input: device, device attribute, char buf, char count
-* Output:
-* Return:
-***********************************************************************/
-static ssize_t fts_gesture_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct input_dev *input_dev = fts_data->input_dev;
-	mutex_lock(&input_dev->mutex);
-	if (FTS_SYSFS_ECHO_ON(buf)) {
-		FTS_INFO("[GESTURE]enable gesture");
-		fts_gesture_data.mode = ENABLE;
-	} else if (FTS_SYSFS_ECHO_OFF(buf)) {
-		FTS_INFO("[GESTURE]disable gesture");
-		fts_gesture_data.mode = DISABLE;
-	}
-	mutex_unlock(&input_dev->mutex);
-
-	return count;
-}
-
-/************************************************************************
-* Name: fts_gesture_buf_show
-*  Brief:
-*  Input: device, device attribute, char buf
-* Output:
-* Return:
-***********************************************************************/
-static ssize_t fts_gesture_buf_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	int count;
-	int i = 0;
-	struct input_dev *input_dev = fts_data->input_dev;
-
-	mutex_lock(&input_dev->mutex);
-	count = snprintf(buf, PAGE_SIZE, "Gesture ID: 0x%x\n", fts_gesture_data.header[0]);
-	count += snprintf(buf + count, PAGE_SIZE, "Gesture PointNum: %d\n", fts_gesture_data.header[1]);
-	count += snprintf(buf + count, PAGE_SIZE, "Gesture Point Buf:\n");
-	for (i = 0; i < fts_gesture_data.header[1]; i++) {
-		count +=
-		    snprintf(buf + count, PAGE_SIZE, "%3d(%4d,%4d) ", i, fts_gesture_data.coordinate_x[i],
-			     fts_gesture_data.coordinate_y[i]);
-		if ((i + 1) % 4 == 0)
-			count += snprintf(buf + count, PAGE_SIZE, "\n");
-	}
-	count += snprintf(buf + count, PAGE_SIZE, "\n");
-	mutex_unlock(&input_dev->mutex);
-
-	return count;
-}
-
-/************************************************************************
-* Name: fts_gesture_buf_store
-*  Brief:
-*  Input: device, device attribute, char buf, char count
-* Output:
-* Return:
-***********************************************************************/
-static ssize_t fts_gesture_buf_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
-{
-	/* place holder for future use */
-	return -EPERM;
-}
-
-/*****************************************************************************
-*   Name: fts_create_gesture_sysfs
-*  Brief:
-*  Input:
-* Output:
-* Return: 0-success or others-error
-*****************************************************************************/
-int fts_create_gesture_sysfs(struct i2c_client *client)
-{
-	int ret = 0;
-
-	ret = sysfs_create_group(&client->dev.kobj, &fts_gesture_group);
-	if (ret != 0) {
-		FTS_ERROR("[GESTURE]fts_gesture_mode_group(sysfs) create failed!");
-		sysfs_remove_group(&client->dev.kobj, &fts_gesture_group);
-		return ret;
-	}
-	return 0;
-}
 
 /*****************************************************************************
 *   Name: fts_gesture_recovery
@@ -411,15 +272,12 @@ int fts_gesture_resume(struct i2c_client *client)
 *****************************************************************************/
 int fts_gesture_init(struct fts_ts_data *ts_data)
 {
-	struct i2c_client *client = ts_data->client;
 	struct input_dev *input_dev = ts_data->input_dev;
 	int ret;
 
 	FTS_FUNC_ENTER();
 	input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
 	__set_bit(KEY_WAKEUP, input_dev->keybit);
-
-	fts_create_gesture_sysfs(client);
 
 	ret = tp_common_set_double_tap_ops(&double_tap_ops);
 	if (ret < 0) {
@@ -444,7 +302,6 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 int fts_gesture_exit(struct i2c_client *client)
 {
 	FTS_FUNC_ENTER();
-	sysfs_remove_group(&client->dev.kobj, &fts_gesture_group);
 	FTS_FUNC_EXIT();
 	return 0;
 }
