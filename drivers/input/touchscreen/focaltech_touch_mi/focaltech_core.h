@@ -156,6 +156,7 @@ struct fts_ts_data {
 	bool suspended;
 	bool fw_loading;
 	bool irq_disabled;
+	bool double_tap;
 	/*
 	  *when fod unlock, release all points to avoid lose point up_action
 	  */

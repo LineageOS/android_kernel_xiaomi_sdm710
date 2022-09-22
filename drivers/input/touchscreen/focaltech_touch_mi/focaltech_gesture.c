@@ -42,26 +42,9 @@
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef
 *****************************************************************************/
-/*
-* header        -   byte0:gesture id
-*                   byte1:pointnum
-*                   byte2~7:reserved
-* coordinate_x  -   All gesture point x coordinate
-* coordinate_y  -   All gesture point y coordinate
-* mode          -   1:enable gesture function(default)
-*               -   0:disable
-* active        -   1:enter into gesture(suspend)
-*                   0:gesture disable or resume
-*/
-struct fts_gesture_st {
-	u8 mode;		/*host driver enable gesture flag */
-	u8 active;		/*gesture actutally work */
-};
-
 /*****************************************************************************
 * Static variables
 *****************************************************************************/
-static struct fts_gesture_st fts_gesture_data;
 extern struct fts_ts_data *fts_data;
 
 /*****************************************************************************
@@ -74,7 +57,7 @@ extern struct fts_ts_data *fts_data;
 static ssize_t double_tap_show(struct kobject *kobj,
                                struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d\n", fts_gesture_data.mode);
+	return sprintf(buf, "%d\n", fts_data->double_tap);
 }
 
 static ssize_t double_tap_store(struct kobject *kobj,
@@ -85,9 +68,10 @@ static ssize_t double_tap_store(struct kobject *kobj,
 
 	rc = kstrtoint(buf, 10, &val);
 	if (rc)
-	return -EINVAL;
+		return -EINVAL;
 
-	fts_gesture_data.mode = !!val;
+	fts_data->double_tap = !!val;
+
 	return count;
 }
 
@@ -105,8 +89,7 @@ static struct tp_common_ops double_tap_ops = {
 *****************************************************************************/
 void fts_gesture_recovery(struct i2c_client *client)
 {
-	if ((ENABLE == fts_gesture_data.mode) && (ENABLE == fts_gesture_data.active)) {
-		FTS_INFO("enter fts_gesture_recovery");
+	if (fts_data->double_tap && fts_data->suspended) {
 		fts_i2c_write_reg(client, 0xD1, 0xff);
 		fts_i2c_write_reg(client, 0xD2, 0xff);
 		fts_i2c_write_reg(client, 0xD5, 0xff);
@@ -180,29 +163,24 @@ int fts_gesture_suspend(struct i2c_client *client)
 {
 	int ret;
 
-	FTS_INFO("gesture suspend...");
-	/* gesture not enable, return immediately */
-	if (fts_gesture_data.mode == DISABLE) {
-		FTS_INFO("gesture is disabled");
+	if (!fts_data->double_tap) {
+		FTS_INFO("Double-tap is disabled");
 		return -EINVAL;
 	}
 	ret = fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
 	if (ret) {
 		FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
-		fts_gesture_data.active = DISABLE;
 		return -EIO;
 	}
 
 	ret = fts_fod_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, true);
 	if (ret) {
 		FTS_ERROR("[GESTURE]Enter into gesture(suspend) failed!\n");
-		fts_gesture_data.active = DISABLE;
 		return -EIO;
 	}
 
-	fts_gesture_data.active = ENABLE;
 	FTS_INFO("[GESTURE]Enter into gesture(suspend) successfully!");
-	FTS_FUNC_EXIT();
+
 	return 0;
 }
 
@@ -217,15 +195,8 @@ int fts_gesture_resume(struct i2c_client *client)
 {
 	int ret;
 
-	FTS_INFO("gesture resume...");
-	/* gesture not enable, return immediately */
-	if (fts_gesture_data.mode == DISABLE) {
-		FTS_DEBUG("gesture is disabled");
-		return -EINVAL;
-	}
-
-	if (fts_gesture_data.active == DISABLE) {
-		FTS_DEBUG("gesture in suspend is failed, no running fts_gesture_resume");
+	if (!fts_data->double_tap) {
+		FTS_INFO("Double-tap is disabled");
 		return -EINVAL;
 	}
 	ret = fts_gesture_reg_write(client, FTS_REG_GESTURE_DOUBLETAP_ON, false);
@@ -240,10 +211,9 @@ int fts_gesture_resume(struct i2c_client *client)
 		return -EIO;
 	}
 
-	fts_gesture_data.active = DISABLE;
 	msleep(10);
 	FTS_INFO("[GESTURE]resume from gesture successfully!");
-	FTS_FUNC_EXIT();
+
 	return 0;
 }
 
@@ -269,8 +239,7 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 		          __func__, ret);
 	}
 
-	fts_gesture_data.mode = DISABLE;
-	fts_gesture_data.active = DISABLE;
+	fts_data->double_tap = false;
 
 	FTS_FUNC_EXIT();
 	return 0;
