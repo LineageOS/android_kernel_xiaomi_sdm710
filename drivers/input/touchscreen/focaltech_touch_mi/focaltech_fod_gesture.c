@@ -326,11 +326,7 @@ static struct tp_common_ops double_tap_ops = {
 
 int fts_fod_gesture_init(struct fts_ts_data *ts_data)
 {
-	struct input_dev *input_dev = ts_data->input_dev;
 	int ret;
-
-	input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
-	__set_bit(KEY_WAKEUP, input_dev->keybit);
 
 	ret = tp_common_set_double_tap_ops(&double_tap_ops);
 	if (ret < 0) {

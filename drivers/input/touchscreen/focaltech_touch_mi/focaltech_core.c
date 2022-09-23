@@ -903,12 +903,6 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 	input_dev->dev.parent = &ts_data->client->dev;
 	input_set_drvdata(input_dev, ts_data);
 
-	__set_bit(EV_SYN, input_dev->evbit);
-	__set_bit(EV_ABS, input_dev->evbit);
-	__set_bit(EV_KEY, input_dev->evbit);
-	__set_bit(BTN_TOUCH, input_dev->keybit);
-	__set_bit(INPUT_PROP_DIRECT, input_dev->propbit);
-
 	if (pdata->have_key) {
 		FTS_INFO("set key capabilities");
 		for (key_num = 0; key_num < pdata->key_number; key_num++)
@@ -919,8 +913,9 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max - 1, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 0xFF, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
-	input_set_capability(input_dev, EV_KEY, KEY_GOTO);
 	input_set_capability(input_dev, EV_KEY, BTN_INFO);
+	input_set_capability(input_dev, EV_KEY, KEY_GOTO);
+	input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
 
 	point_num = pdata->max_touch_number;
 	ts_data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;
