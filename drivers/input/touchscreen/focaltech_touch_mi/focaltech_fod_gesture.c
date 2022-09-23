@@ -85,7 +85,6 @@ static int fts_fod_report_ptr_event(struct fts_ts_data *ts_data,
 		input_mt_slot(input_dev, ev->point_id);
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 1);
 		input_report_key(input_dev, BTN_TOUCH, 1);
-		input_report_key(input_dev, BTN_TOOL_FINGER, 1);
 		input_report_abs(input_dev, ABS_MT_POSITION_X, x);
 		input_report_abs(input_dev, ABS_MT_POSITION_Y, y);
 		input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, z);
