@@ -594,7 +594,6 @@ static void fts_release_all_finger(void)
 	fts_data->finger_in_fod = false;
 	fts_data->fod_x = 0;
 	fts_data->fod_y = 0;
-	fts_data->overlap_area = 0;
 
 	for (finger_count = 0; finger_count < fts_data->pdata->max_touch_number; finger_count++) {
 		input_mt_slot(input_dev, finger_count);
@@ -679,10 +678,10 @@ static void fts_report_event(struct fts_ts_data *data)
 			if (events[i].area <= 0) {
 				events[i].area = 0x09;
 			}
+			input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR,
+					 events[i].area);
 			input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
 			input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
-			input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, data->overlap_area);
-			input_report_abs(data->input_dev, ABS_MT_WIDTH_MINOR, data->overlap_area);
 
 			touchs |= BIT(events[i].id);
 			data->touchs |= BIT(events[i].id);
@@ -771,7 +770,6 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 					input_report_key(data->input_dev, BTN_INFO, 1);
 					input_sync(data->input_dev);
 					FTS_INFO("Report 0x155 Down for FingerPrint\n");
-					data->overlap_area = 100;
 					data->finger_in_fod = true;
 					data->fod_x = x;
 					data->fod_y = y;
@@ -796,8 +794,6 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 					input_report_abs(data->input_dev, ABS_MT_POSITION_X, x);
 					input_report_abs(data->input_dev, ABS_MT_POSITION_Y, y);
 					input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, z);
-					input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, data->overlap_area);
-					input_report_abs(data->input_dev, ABS_MT_WIDTH_MINOR, data->overlap_area);
 					input_sync(data->input_dev);
 				}
 				mutex_unlock(&data->report_mutex);
@@ -808,7 +804,6 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 				}
 				data->finger_in_fod = false;
 				data->fod_finger_skip = false;
-				data->overlap_area = 0;
 				data->fod_x = 0;
 				data->fod_y = 0;
 				tp_common_notify_fp_state();
@@ -826,7 +821,6 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 			}
 			break;
 		default:
-			data->overlap_area = 0;
 			if (data->suspended)
 				return 0;
 			else
@@ -1039,8 +1033,6 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
 	input_set_capability(input_dev, EV_KEY, KEY_GOTO);
 	input_set_capability(input_dev, EV_KEY, BTN_INFO);
-	input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, pdata->x_min, pdata->x_max - 1, 0, 0);
-	input_set_abs_params(input_dev, ABS_MT_WIDTH_MINOR, pdata->x_min, pdata->x_max - 1, 0, 0);
 
 	point_num = pdata->max_touch_number;
 	ts_data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;

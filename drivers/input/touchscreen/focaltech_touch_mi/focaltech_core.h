@@ -192,7 +192,6 @@ struct fts_ts_data {
 	bool fod_finger_skip;
 	int fod_x;
 	int fod_y;
-	int overlap_area;
 	int aod_status;
 };
 
