@@ -104,12 +104,6 @@
 #define FTS_DEBUG_EN                            1
 
 /*
- * Report Pressure in multitouch
- * 1:enable(default),0:disable
-*/
-#define FTS_REPORT_PRESSURE_EN                  0
-
-/*
  * Nodes for tools, please keep enable
  */
 #define FTS_SYSFS_NODE_EN                       1

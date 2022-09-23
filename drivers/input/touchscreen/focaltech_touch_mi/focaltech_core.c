@@ -672,12 +672,10 @@ static void fts_report_event(struct fts_ts_data *data)
 		if (EVENT_DOWN(events[i].flag)) {
 			input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, true);
 
-#if FTS_REPORT_PRESSURE_EN
 			if (events[i].p <= 0) {
 				events[i].p = 0x3f;
 			}
 			input_report_abs(data->input_dev, ABS_MT_PRESSURE, events[i].p);
-#endif
 			if (events[i].area <= 0) {
 				events[i].area = 0x09;
 			}
@@ -693,9 +691,7 @@ static void fts_report_event(struct fts_ts_data *data)
 			   events[i].y, events[i].p, events[i].area); */
 		} else {
 			uppoint++;
-#if FTS_REPORT_PRESSURE_EN
 			input_report_abs(data->input_dev, ABS_MT_PRESSURE, 0);
-#endif
 			input_mt_report_slot_state(data->input_dev,
 						MT_TOOL_FINGER, false);
 			data->touchs &= ~BIT(events[i].id);
@@ -802,7 +798,6 @@ static int fts_read_and_report_foddata(struct fts_ts_data *data)
 					input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, z);
 					input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, data->overlap_area);
 					input_report_abs(data->input_dev, ABS_MT_WIDTH_MINOR, data->overlap_area);
-					input_report_abs(data->input_dev, ABS_MT_PRESSURE, z);
 					input_sync(data->input_dev);
 				}
 				mutex_unlock(&data->report_mutex);
@@ -1041,9 +1036,7 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 	input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, pdata->x_max - 1, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max - 1, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 0xFF, 0, 0);
-#if FTS_REPORT_PRESSURE_EN
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
-#endif
 	input_set_capability(input_dev, EV_KEY, KEY_GOTO);
 	input_set_capability(input_dev, EV_KEY, BTN_INFO);
 	input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, pdata->x_min, pdata->x_max - 1, 0, 0);
