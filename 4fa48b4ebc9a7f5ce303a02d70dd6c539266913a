@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8cd858f5_1e7e899f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-09-23T17:35:46Z",
+      "side": 1,
+      "message": "Tested on Pyxis:\n- Normal multi-touch mode\n- Fod unlock during normal mode\n- Fod unlock during AOD mode\n- Fod unlock during screen-off\n- Double-tap resume during AOD mode\n- Double-tap resume during screen-off",
+      "revId": "4fa48b4ebc9a7f5ce303a02d70dd6c539266913a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
