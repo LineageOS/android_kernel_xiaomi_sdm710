@@ -16,6 +16,23 @@
       "message": "Verified on Pyxis ",
       "revId": "2cf2414ac06f37497791b61ca4095f107c30a756",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "22f30a76_eccce409",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27772
+      },
+      "writtenOn": "2022-10-05T04:30:10Z",
+      "side": 1,
+      "message": "There are no difference on sirius.\nIf on pyxis and grus to consume less power let\u0027s merge.\nLGTM",
+      "revId": "2cf2414ac06f37497791b61ca4095f107c30a756",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
