@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9527c2bb_185ab370",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-10-06T11:25:54Z",
+      "side": 1,
+      "message": "Tested on Pyxis with ro.lmk.debug\u003dtrue. LMK works fine.",
+      "revId": "a8db965d83f1efcb88aee91af702f586be23b3a7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
