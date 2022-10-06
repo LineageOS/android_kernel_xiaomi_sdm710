@@ -16,6 +16,23 @@
       "message": "Verified on Pyxis ",
       "revId": "a96e5550f71b44b9dc9cf03862df221453adc075",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d9c1af16_b81547de",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-10-06T09:52:46Z",
+      "side": 1,
+      "message": "Tested using this:\n\n1) Enable AOD\n2) Reset batterystats\n$ adb shell dumpsys batterystats --reset\n$ adb shell dumpsys deviceidle force-idle\n3) Disconnect device and wait 20 minutes\n4) Grab batterystats and check screen doze discharge\n$ adb shell dumpsys batterystats | grep \u0027Screen doze discharge\u0027\n\nPrior this patch-set:\nScreen doze discharge: 27.1 mAh\n\nAfter this patch-set:\nScreen doze discharge: 18.2 mAh",
+      "revId": "a96e5550f71b44b9dc9cf03862df221453adc075",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
