@@ -16,6 +16,23 @@
       "message": "Verified on Pyxis ",
       "revId": "5279825f1c87c381c63cf0249bbe068637b7f1a9",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fa7ee05f_ee17b498",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31866
+      },
+      "writtenOn": "2022-10-07T03:04:09Z",
+      "side": 1,
+      "message": "Does this phone in the  screen",
+      "revId": "5279825f1c87c381c63cf0249bbe068637b7f1a9",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
