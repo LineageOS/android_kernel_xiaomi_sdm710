@@ -16,6 +16,29 @@
       "message": "Tested on Pyxis with ro.lmk.debug\u003dtrue. LMK works fine.",
       "revId": "a8db965d83f1efcb88aee91af702f586be23b3a7",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "53cd31ab_288dbc9b",
+        "filename": "arch/arm64/configs/xiaomi/sdm710-common.config",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 25732
+      },
+      "writtenOn": "2022-10-12T10:08:54Z",
+      "side": 1,
+      "message": "extra space",
+      "range": {
+        "startLine": 41,
+        "startChar": 34,
+        "endLine": 41,
+        "endChar": 36
+      },
+      "revId": "a8db965d83f1efcb88aee91af702f586be23b3a7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
