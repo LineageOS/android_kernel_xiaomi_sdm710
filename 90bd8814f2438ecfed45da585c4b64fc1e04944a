@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "661db0e8_31b1a89a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-10-21T16:41:31Z",
+      "side": 1,
+      "message": "Applied a bug-fix that becomes evident on Sirius...\nThanks Alex...",
+      "revId": "90bd8814f2438ecfed45da585c4b64fc1e04944a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
