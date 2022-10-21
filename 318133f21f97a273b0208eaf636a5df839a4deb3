@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f686de16_af096446",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-10-21T18:05:49Z",
+      "side": 1,
+      "message": "Fix moved to correct commit I512fa3692dd0acce6fba2ddbdea409642db0795e",
+      "revId": "318133f21f97a273b0208eaf636a5df839a4deb3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
