@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "dff2a54c_d8661f41",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2022-11-16T14:41:38Z",
+      "side": 1,
+      "message": "Found during testing of Lineage 20 on Pyxis.",
+      "revId": "6be09aab2938bdd72411059b96a9bd17b82bf82b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
