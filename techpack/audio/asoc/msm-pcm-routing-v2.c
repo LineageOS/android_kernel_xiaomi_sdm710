@@ -2573,8 +2573,8 @@ static int msm_routing_lsm_func_get(struct snd_kcontrol *kcontrol,
 			strlen(lsm_port_text[10])))
 		port_id = AFE_PORT_ID_INT3_MI2S_TX;
 
-	if (strnstr(kcontrol->id.name, lsm_port_text[13],
-			strlen(lsm_port_text[13])))
+	if (strnstr(kcontrol->id.name, lsm_port_text[11],
+			strlen(lsm_port_text[11])))
 		port_id = AFE_PORT_ID_INT2_MI2S_TX;
 
 	mad_type = afe_port_get_mad_type(port_id);
@@ -2656,8 +2656,8 @@ static int msm_routing_lsm_func_put(struct snd_kcontrol *kcontrol,
 			strlen(lsm_port_text[10])))
 		port_id = AFE_PORT_ID_INT3_MI2S_TX;
 
-	if (strnstr(kcontrol->id.name, lsm_port_text[13],
-			strlen(lsm_port_text[13])))
+	if (strnstr(kcontrol->id.name, lsm_port_text[11],
+			strlen(lsm_port_text[11])))
 		port_id = AFE_PORT_ID_INT2_MI2S_TX;
 
 	pr_debug("%s: port_id 0x%x, mad_type %d\n", __func__, port_id,
