@@ -4864,7 +4864,7 @@ static int dsi_display_sysfs_deinit(struct dsi_display *display)
 
 }
 
-void dsi_display_set_fod_ui(struct dsi_display *display, bool status)
+static void dsi_display_set_fod_ui(struct dsi_display *display, bool status)
 {
 	struct device *dev = &display->pdev->dev;
 	atomic_set(&display->fod_ui, status);
@@ -5882,6 +5882,34 @@ int dsi_display_get_panel_vfp(void *dsi_display,
 	return rc;
 }
 
+int dsi_display_get_dim_layer_alpha(void *dsi_display,
+				    enum msm_dim_layer_type type, u32 *alpha)
+{
+	struct dsi_display *display = dsi_display;
+	int rc = -ENOTSUPP;
+
+	dsi_panel_acquire_panel_lock(display->panel);
+
+	switch (type) {
+	case MSM_DIM_LAYER_FOD:
+		/* Fetch alpha value for dimming layer */
+		*alpha = dsi_panel_get_fod_dim_alpha(display->panel);
+
+		/* Return 1 regardless of returned alpha value because
+		 * return value determine also type of global dimming
+		 * layer.
+		 */
+		rc = 1;
+		break;
+	default:
+		pr_warn("Unknown dimming layer type\n");
+	}
+
+	dsi_panel_release_panel_lock(display->panel);
+
+	return rc;
+}
+
 int dsi_display_find_mode(struct dsi_display *display,
 		const struct dsi_display_mode *cmp,
 		struct dsi_display_mode **out_mode)
@@ -6677,8 +6705,20 @@ static int dsi_display_set_roi(struct dsi_display *display,
 int dsi_display_pre_kickoff(struct dsi_display *display,
 		struct msm_display_kickoff_params *params)
 {
+	enum msm_dim_layer_type type = params->dim_layer_type;
+	enum msm_dim_layer_type prev_type;
 	int rc = 0;
 	int i;
+
+	/* pass current dimming layer type to panel */
+	prev_type = dsi_panel_update_dimlayer(display->panel, type);
+
+	/* notify userspace if we are switching from or to FOD dimming
+	 * layer type
+	 */
+	if ((type == MSM_DIM_LAYER_FOD || prev_type == MSM_DIM_LAYER_FOD) &&
+	    (type != prev_type))
+		dsi_display_set_fod_ui(display, type == MSM_DIM_LAYER_FOD);
 
 	/* check and setup MISR */
 	if (display->misr_enable)
@@ -7042,10 +7082,6 @@ int dsi_display_unprepare(struct dsi_display *display)
 	mutex_unlock(&display->display_lock);
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT);
 	return rc;
-}
-
-struct dsi_display *get_main_display(void) {
-	return primary_display;
 }
 
 static int __init dsi_display_register(void)

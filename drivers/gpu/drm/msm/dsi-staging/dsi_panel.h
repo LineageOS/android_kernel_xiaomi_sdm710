@@ -227,6 +227,7 @@ struct dsi_panel {
 	bool hbm_enabled;
 	bool sync_broadcast_en;
 	int power_mode;
+	enum msm_dim_layer_type dimlayer_type;
 
 	struct dsi_panel_exd_config exd_config;
 
@@ -333,8 +334,6 @@ int dsi_panel_parse_esd_reg_read_configs(struct dsi_panel *panel,
 
 void dsi_panel_ext_bridge_put(struct dsi_panel *panel);
 
-int dsi_panel_set_fod_hbm(struct dsi_panel *panel, bool status);
-
 u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel);
 
 static inline bool dsi_panel_is_hbm_enabled(struct dsi_panel *panel)
@@ -349,5 +348,8 @@ static inline bool dsi_panel_is_hbm_enabled(struct dsi_panel *panel)
 }
 
 int dsi_panel_set_hbm_enabled(struct dsi_panel *panel, bool status);
+
+enum msm_dim_layer_type dsi_panel_update_dimlayer(struct dsi_panel *panel,
+						  enum msm_dim_layer_type type);
 
 #endif /* _DSI_PANEL_H_ */

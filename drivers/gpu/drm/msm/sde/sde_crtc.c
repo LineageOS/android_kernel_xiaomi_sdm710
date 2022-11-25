@@ -1651,9 +1651,10 @@ static void _sde_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 			_sde_crtc_setup_dim_layer_cfg(crtc, sde_crtc,
 					mixer, &cstate->dim_layer[i]);
 
-		if (cstate->fod_dim_layer)
-			_sde_crtc_setup_dim_layer_cfg(crtc, sde_crtc,
-					mixer, cstate->fod_dim_layer);
+		/* Setup global dimming layer if present */
+		if (cstate->global_dim_layer)
+			_sde_crtc_setup_dim_layer_cfg(crtc, sde_crtc, mixer,
+						      cstate->global_dim_layer);
 	}
 
 	_sde_crtc_program_lm_output_roi(crtc);
@@ -2570,7 +2571,8 @@ static void _sde_crtc_set_dim_layer_v1(struct sde_crtc_state *cstate,
 	}
 
 	count = dim_layer_v1.num_layers;
-	if (count > SDE_MAX_DIM_LAYERS) {
+	/* Reserve 1 layer for global dimming */
+	if (count > SDE_MAX_DIM_LAYERS - 1) {
 		SDE_ERROR("invalid number of dim_layers:%d", count);
 		return;
 	}
@@ -4625,84 +4627,140 @@ static int _sde_crtc_check_secure_state(struct drm_crtc *crtc,
 	return 0;
 }
 
-static struct sde_hw_dim_layer* sde_crtc_setup_fod_dim_layer(
-		struct sde_crtc_state *cstate,
-		uint32_t stage)
+static int _sde_crtc_setup_global_dim_layer(struct sde_crtc_state *cstate,
+					    u32 stage, u32 alpha)
 {
 	struct drm_crtc_state *crtc_state = &cstate->base;
 	struct drm_display_mode *mode = &crtc_state->adjusted_mode;
 	struct sde_hw_dim_layer *dim_layer = NULL;
-	struct dsi_display *display;
 	struct sde_kms *kms;
-	uint32_t layer_stage;
-	uint32_t alpha;
+	u32 layer_stage;
 
+	/* Get KMS object */
 	kms = _sde_crtc_get_kms(crtc_state->crtc);
 	if (!kms || !kms->catalog) {
-		SDE_ERROR("Invalid kms\n");
-		goto error;
+		SDE_ERROR("No valid kms found\n");
+		return -EINVAL;
 	}
 
-	layer_stage = SDE_STAGE_0 + stage;
+	/* Check number of blending stages */
+	layer_stage = stage + SDE_STAGE_0;
 	if (layer_stage >= kms->catalog->mixer[0].sblk->maxblendstages) {
-		SDE_ERROR("Stage too large %u vs max %u\n", layer_stage,
-			kms->catalog->mixer[0].sblk->maxblendstages);
-		goto error;
+		SDE_ERROR("Stage %u is greater than max (%u)\n", layer_stage,
+			  kms->catalog->mixer[0].sblk->maxblendstages);
+		return -EINVAL;
 	}
 
-	if (cstate->num_dim_layers == SDE_MAX_DIM_LAYERS) {
-		SDE_ERROR("Max dim layers reached\n");
-		goto error;
-	}
+	/* The last dimming layer is the state is reserved for global dimming */
+	dim_layer = &cstate->dim_layer[SDE_MAX_DIM_LAYERS - 1];
 
-	display = get_main_display();
-	if (!display || !display->panel) {
-		SDE_ERROR("Invalid primary display\n");
-		goto error;
-	}
-
-	mutex_lock(&display->panel->panel_lock);
-	alpha = dsi_panel_get_fod_dim_alpha(display->panel);
-	mutex_unlock(&display->panel->panel_lock);
-
-	dim_layer = &cstate->dim_layer[cstate->num_dim_layers];
+	/* Setup the layer */
 	dim_layer->flags = SDE_DRM_DIM_LAYER_INCLUSIVE;
 	dim_layer->stage = layer_stage;
 	dim_layer->rect.x = 0;
 	dim_layer->rect.y = 0;
 	dim_layer->rect.w = mode->hdisplay;
 	dim_layer->rect.h = mode->vdisplay;
-	dim_layer->color_fill =
-			(struct sde_mdss_color) {0, 0, 0, alpha};
+	dim_layer->color_fill = (struct sde_mdss_color){0, 0, 0, alpha};
 
-error:
-	return dim_layer;
+	cstate->global_dim_layer = dim_layer;
+
+	return 0;
 }
 
-static void sde_crtc_fod_atomic_check(struct sde_crtc_state *cstate,
-		struct plane_state *pstates, int cnt)
+static int sde_crtc_get_dim_layer_alpha(struct sde_crtc_state *cstate,
+					enum msm_dim_layer_type type,
+					u32 *alpha)
 {
-	uint32_t dim_layer_stage;
-	int plane_idx;
+	int i, rc = -ENOTSUPP;
 
-	for (plane_idx = 0; plane_idx < cnt; plane_idx++)
-		if (sde_plane_is_fod_layer(pstates[plane_idx].drm_pstate))
+	for (i = 0; i < cstate->num_connectors; i++) {
+		rc = sde_connector_get_dim_layer_alpha(cstate->connectors[i],
+						       type, alpha);
+		if (rc >= 0)
 			break;
-
-	if (plane_idx == cnt) {
-		cstate->fod_dim_layer = NULL;
-	} else {
-		dim_layer_stage = pstates[plane_idx].stage;
-		cstate->fod_dim_layer = sde_crtc_setup_fod_dim_layer(cstate,
-				dim_layer_stage);
 	}
 
-	if (!cstate->fod_dim_layer)
-		return;
+	return rc;
+}
 
-	for (plane_idx = 0; plane_idx < cnt; plane_idx++)
-		if (pstates[plane_idx].stage >= dim_layer_stage)
-			pstates[plane_idx].stage++;
+static int sde_crtc_global_dim_atomic_check(struct sde_crtc_state *cstate,
+					    struct plane_state *pstates,
+					    int cnt)
+{
+	enum msm_dim_layer_type type;
+	u32 alpha, stage = 0;
+	int i, rc = 0;
+
+	cstate->global_dim_layer = NULL;
+	cstate->global_dim_layer_type = MSM_DIM_LAYER_NONE;
+
+	/* First look for FOD layer if it is provided by userspace.
+	 * If so use its stage value to inject global dimming layer
+	 * at this stage so it will dim only layers below FOD layer.
+	 * FOD and all above layers will not be dimmed.
+	 */
+	for (i = 0; i < cnt; i++)
+		if (sde_plane_is_fod_layer(pstates[i].drm_pstate))
+			break;
+
+	if (i < cnt) {
+		type = MSM_DIM_LAYER_FOD;
+		/* Get alpha value for FOD dim layer type */
+		rc = sde_crtc_get_dim_layer_alpha(cstate, type, &alpha);
+		/* Save FOD layer stage */
+		stage = pstates[i].stage;
+	}
+
+	/* If FOD layer is not provided by userspace or FOD dim layer type is
+	 * not supported or disabled try to get alpha for TOP dim layer type */
+	if (rc <= 0) {
+		type = MSM_DIM_LAYER_TOP;
+		rc = sde_crtc_get_dim_layer_alpha(cstate, type, &alpha);
+	}
+
+	switch (rc) {
+	case 1:
+		break;
+	case 0:
+		SDE_DEBUG("Global dimming layer is disabled\n");
+		return 0;
+	case -ENOTSUPP:
+		SDE_DEBUG("No connector supports global dimming\n");
+		return 0;
+	default:
+		SDE_ERROR("Failed to get alpha for dimming layer, rc=%d\n", rc);
+		return rc;
+	}
+
+	if (type == MSM_DIM_LAYER_TOP) {
+		/* For TOP dim layer type look for top-most stage */
+		for (i = 0; i < cnt; i++)
+			if (pstates[i].stage > stage)
+				stage = pstates[i].stage;
+
+		/* Dimming layer sits on top */
+		stage++;
+	}
+
+	rc = _sde_crtc_setup_global_dim_layer(cstate, stage, alpha);
+	if (rc) {
+		SDE_ERROR("Failed to setup global dimming layer\n");
+		return rc;
+	}
+
+	if (type == MSM_DIM_LAYER_FOD) {
+		/* For FOD dim layer type we have to adjust stage of FOD layer
+		 * and of all layers above it
+		 */
+		for (i = 0; i < cnt; i++)
+			if (pstates[i].stage >= stage)
+				pstates[i].stage++;
+	}
+
+	cstate->global_dim_layer_type = type;
+
+	return rc;
 }
 
 static int sde_crtc_atomic_check(struct drm_crtc *crtc,
@@ -4855,7 +4913,10 @@ static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 		}
 	}
 
-	sde_crtc_fod_atomic_check(cstate, pstates, cnt);
+	/* Check for global dimming */
+	rc = sde_crtc_global_dim_atomic_check(cstate, pstates, cnt);
+	if (rc)
+		goto end;
 
 	/* assign mixer stages based on sorted zpos property */
 	sort(pstates, cnt, sizeof(pstates[0]), pstate_cmp, NULL);

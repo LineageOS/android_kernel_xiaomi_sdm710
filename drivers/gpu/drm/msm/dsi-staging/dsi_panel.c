@@ -927,6 +927,53 @@ static u32 dsi_panel_get_backlight(struct dsi_panel *panel)
 	return panel->bl_config.bl_level;
 }
 
+enum msm_dim_layer_type dsi_panel_update_dimlayer(struct dsi_panel *panel,
+						  enum msm_dim_layer_type type)
+{
+	dsi_panel_acquire_panel_lock(panel);
+
+	/* Skip if type of dimlayer was not changed */
+	if (panel->dimlayer_type == type)
+		goto no_change;
+
+	if (type == MSM_DIM_LAYER_FOD) {
+		/* Switch to FOD mode */
+
+		/* Switch to HBM mode if:
+		 * - it is not already enabled by user
+		 * - we are coming from doze mode
+		 */
+		if (!panel->hbm_enabled || panel->doze_status)
+			dsi_panel_set_hbm(panel, true);
+	}
+	else if (panel->dimlayer_type == MSM_DIM_LAYER_FOD) {
+		if (!panel->doze_status) {
+			/* Switch to normal mode */
+
+			/* Switch-off HBM if it is not enabled by user */
+			if (!panel->hbm_enabled)
+				dsi_panel_set_hbm(panel, false);
+		} else {
+			/* Switch back to doze mode */
+			if (panel->hbm_enabled)
+				DSI_PANEL_SEND(panel,
+					       DISP_HBM_FOD_OFF_DOZE_HBM_ON);
+			else
+				DSI_PANEL_SEND(panel,
+					       DISP_HBM_FOD_OFF_DOZE_LBM_ON);
+		}
+	}
+
+	/* Swap new status with previous one */
+	type = xchg(&panel->dimlayer_type, type);
+
+no_change:
+	dsi_panel_release_panel_lock(panel);
+
+	/* Return previous dimming layer type */
+	return type;
+}
+
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 {
 	int rc = 0;
@@ -983,39 +1030,6 @@ u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel)
 	return interpolate(brightness,
 			panel->fod_dim_lut[i - 1].brightness, panel->fod_dim_lut[i].brightness,
 			panel->fod_dim_lut[i - 1].alpha, panel->fod_dim_lut[i].alpha);
-}
-
-int dsi_panel_set_fod_hbm(struct dsi_panel *panel, bool status)
-{
-	int rc = 0;
-
-	if (status) {
-		/* Switch to HBM mode if:
-		 * - it is not already enabled by user
-		 * - we're coming from doze mode
-		 */
-		if (!panel->hbm_enabled || panel->doze_status)
-			rc = dsi_panel_set_hbm(panel, true);
-	} else {
-		if (!panel->doze_status) {
-			/* Switching back to normal mode */
-
-			/* Switch-off HBM mode if it is not enabled by user */
-			if (!panel->hbm_enabled)
-				rc = dsi_panel_set_hbm(panel, false);
-
-			return rc;
-		}
-		/* Switching back to doze mode */
-		if (panel->hbm_enabled)
-			rc = DSI_PANEL_SEND(panel,
-					    DISP_HBM_FOD_OFF_DOZE_HBM_ON);
-		else
-			rc = DSI_PANEL_SEND(panel,
-					    DISP_HBM_FOD_OFF_DOZE_LBM_ON);
-	}
-
-	return rc;
 }
 
 int dsi_panel_set_hbm_enabled(struct dsi_panel *panel, bool status)
