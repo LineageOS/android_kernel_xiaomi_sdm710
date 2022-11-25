@@ -1,0 +1,42 @@
+# Xiaomi configuration options
+
+config MACH_XIAOMI
+	bool "Xiaomi device"
+	depends on ARCH_QCOM
+	help
+	  Support for Xiaomi products
+
+config MACH_XIAOMI_SDM710
+	bool "Xiaomi SDM710"
+	depends on ARCH_QCOM
+	select MACH_XIAOMI
+	help
+	  Support for Xiaomi SDM710 devices
+
+menu "Xiaomi board selection"
+
+	config MACH_XIAOMI_GRUS
+		bool "Xiaomi grus board"
+		select MACH_XIAOMI_SDM710
+		help
+		  Support for Mi 9 SE
+
+	config MACH_XIAOMI_PYXIS
+		bool "Xiaomi pyxis board"
+		select MACH_XIAOMI_SDM710
+		help
+		  Support for Mi CC 9/Mi 9 Lite
+
+	config MACH_XIAOMI_SIRIUS
+		bool "Xiaomi sirius board"
+		select MACH_XIAOMI_SDM710
+		help
+		  Support for Mi 8 SE
+
+	config MACH_XIAOMI_VELA
+		bool "Xiaomi vela board"
+		select MACH_XIAOMI_SDM710
+		help
+		  Support for Mi CC 9 Meitu Edition
+
+endmenu
