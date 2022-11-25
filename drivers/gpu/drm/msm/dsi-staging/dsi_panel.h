@@ -106,6 +106,8 @@ struct dsi_backlight_config {
 	u32 bl_level;
 	u32 bl_scale;
 	u32 bl_scale_ad;
+	u32 bl_doze_lpm;
+	u32 bl_doze_hbm;
 
 	int en_gpio;
 	bool dcs_type_ss;
@@ -221,6 +223,7 @@ struct dsi_panel {
 	char dsc_pps_cmd[DSI_CMD_PPS_SIZE];
 	enum dsi_dms_mode dms_mode;
 
+	bool doze_status;
 	bool hbm_enabled;
 	bool sync_broadcast_en;
 	int power_mode;

@@ -64,9 +64,12 @@
 		/* IRQF_ONESHOT | IRQF_TRIGGER_FALLING */
 		/* trig-flags: falling-0x0002 rasing-0x0001 */
 		qcom,esd-err-irq-gpio = <&tlmm 78 0x2002>;
-		qcom,elvss_dimming_check_enable;
-		qcom,disp-doze-backlight-threshold = <8>;
+
+		qcom,disp-doze-lbm-backlight = <20>;
+		qcom,disp-doze-hbm-backlight = <266>;
 		qcom,disp-fod-off-dimming-delay = <85>;
+
+		qcom,elvss_dimming_check_enable;
 		qcom,mdss-dsi-panel-elvss-dimming-read-length = <1>;
 		qcom,mdss-dsi-dispparam-elvss-dimming-offset-command = [39 01 00 00 00 00 02 B0 07];
 		qcom,mdss-dsi-dispparam-elvss-dimming-offset-command-state = "dsi_hs_mode";
@@ -191,25 +194,11 @@
 					15 01 00 00 10 00 02 53 E0];
 				qcom,mdss-dsi-dispparam-hbm-on-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-hbm-fod-off-doze-hbm-on-command = [
-					39 01 00 00 00 00 02 53 22
-					39 00 00 00 00 00 03 F0 5A 5A
-					39 00 00 00 00 00 03 B7 01 4B
-					39 00 00 00 00 00 02 B0 03
-					39 00 00 00 00 00 02 B7 49
-					39 00 00 00 00 00 02 B0 07
-					39 00 00 00 00 00 02 B7 91
-					39 01 00 00 01 00 03 F0 A5 A5];
-				qcom,mdss-dsi-dispparam-hbm-fod-off-doze-hbm-on-command-state = "dsi_lp_mode";
+					15 01 00 00 10 00 02 53 22];
+				qcom,mdss-dsi-dispparam-hbm-fod-off-doze-hbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-dispparam-hbm-fod-off-doze-lbm-on-command = [
-					39 01 00 00 00 00 02 53 23
-					39 00 00 00 00 00 03 F0 5A 5A
-					39 00 00 00 00 00 03 B7 01 4B
-					39 00 00 00 00 00 02 B0 03
-					39 00 00 00 00 00 02 B7 49
-					39 00 00 00 00 00 02 B0 07
-					39 00 00 00 00 00 02 B7 91
-					39 01 00 00 01 00 03 F0 A5 A5];
-				qcom,mdss-dsi-dispparam-hbm-fod-off-doze-lbm-on-command-state = "dsi_lp_mode";
+					15 01 00 00 10 00 02 53 23];
+				qcom,mdss-dsi-dispparam-hbm-fod-off-doze-lbm-on-command-state = "dsi_hs_mode";
 				qcom,mdss-dsi-dispparam-crc-srgb-on-command = [
 					/* CRC Enable + sRGB mode */
 					39 01 00 00 00 00 02 81 90
