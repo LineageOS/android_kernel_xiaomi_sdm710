@@ -202,17 +202,13 @@
 				qcom,mdss-dsi-dispparam-acl-l2-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-acl-l3-command = [39 01 00 00 00 00 02 55 03];/* ACL 30% */
 				qcom,mdss-dsi-dispparam-acl-l3-command-state = "dsi_lp_mode";
-				qcom,mdss-dsi-dispparam-hbm-off-command = [39 01 00 00 00 00 02 53 28];
-				qcom,mdss-dsi-dispparam-hbm-off-command-state = "dsi_lp_mode";
-				qcom,mdss-dsi-dispparam-hbm-on-command = [39 01 00 00 00 00 02 53 e8];
-				qcom,mdss-dsi-dispparam-hbm-on-command-state = "dsi_lp_mode";
-				qcom,mdss-dsi-dispparam-hbm-fod-off-command = [
+				qcom,mdss-dsi-dispparam-hbm-off-command = [
 					15 01 00 00 10 00 02 53 20];
-				qcom,mdss-dsi-dispparam-hbm-fod-off-command-state = "dsi_lp_mode";
-				qcom,mdss-dsi-dispparam-hbm-fod-on-command = [
+				qcom,mdss-dsi-dispparam-hbm-off-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-dispparam-hbm-on-command = [
 					15 01 00 00 10 00 02 53 E0];
 
-				qcom,mdss-dsi-dispparam-hbm-fod-on-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-dispparam-hbm-on-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-crc-srgb-on-command = [
 					/* CRC Enable + sRGB mode */
 					39 01 00 00 00 00 02 81 90

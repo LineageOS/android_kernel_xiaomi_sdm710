@@ -892,6 +892,29 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	return rc;
 }
 
+static int __dsi_panel_send(struct dsi_panel *panel, enum dsi_cmd_set_type type,
+			    const char *name)
+{
+	int rc;
+
+	rc = dsi_panel_tx_cmd_set(panel, type);
+	if (rc)
+		pr_err("Failed to send %s cmd, rc=%d\n", name, rc);
+
+	return rc;
+}
+
+#define DSI_PANEL_SEND(PANEL, CMDSET)					\
+	__dsi_panel_send(PANEL, __PASTE(DSI_CMD_SET_,CMDSET),		\
+			 __stringify(CMDSET))
+
+static int dsi_panel_set_hbm(struct dsi_panel *panel, bool enabled)
+{
+	return enabled ?
+		DSI_PANEL_SEND(panel, DISP_HBM_ON) :
+		DSI_PANEL_SEND(panel, DISP_HBM_OFF);
+}
+
 static u32 dsi_panel_get_backlight(struct dsi_panel *panel)
 {
 	return panel->bl_config.bl_level;
@@ -931,6 +954,10 @@ u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel)
 	u32 brightness = dsi_panel_get_backlight(panel);
 	int i;
 
+	/* No dimming is required if HBM mode is enabled */
+	if (panel->hbm_enabled)
+		return 0;
+
 	if (!panel->fod_dim_lut)
 		return 0;
 
@@ -951,19 +978,30 @@ u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel)
 
 int dsi_panel_set_fod_hbm(struct dsi_panel *panel, bool status)
 {
+	/* If HBM is enabled by user do nothing */
+	if (panel->hbm_enabled)
+		return 0;
+
+	return dsi_panel_set_hbm(panel, status);
+}
+
+int dsi_panel_set_hbm_enabled(struct dsi_panel *panel, bool status)
+{
 	int rc = 0;
 
-	if (status) {
-		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_DISP_HBM_FOD_ON);
-		if (rc)
-			pr_err("[%s] failed to send DSI_CMD_SET_DISP_HBM_FOD_ON cmd, rc=%d\n",
-					panel->name, rc);
-	} else {
-		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_DISP_HBM_FOD_OFF);
-		if (rc)
-			pr_err("[%s] failed to send DSI_CMD_SET_DISP_HBM_FOD_OFF cmd, rc=%d\n",
-					panel->name, rc);
+	if (!panel)
+		return -EINVAL;
+
+	dsi_panel_acquire_panel_lock(panel);
+
+	if (panel->hbm_enabled != status) {
+		panel->hbm_enabled = status;
+
+		if (dsi_panel_initialized(panel))
+			rc = dsi_panel_set_hbm(panel, status);
 	}
+
+	dsi_panel_release_panel_lock(panel);
 
 	return rc;
 }
@@ -1808,8 +1846,8 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command",
 	"qcom,mdss-dsi-post-mode-switch-on-command",
-	"qcom,mdss-dsi-dispparam-hbm-fod-on-command",
-	"qcom,mdss-dsi-dispparam-hbm-fod-off-command",
+	"qcom,mdss-dsi-dispparam-hbm-on-command",
+	"qcom,mdss-dsi-dispparam-hbm-off-command",
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -1834,8 +1872,8 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"ROI not parsed from DTSI, generated dynamically",
 	"qcom,mdss-dsi-timing-switch-command-state",
 	"qcom,mdss-dsi-post-mode-switch-on-command-state",
-	"qcom,mdss-dsi-dispparam-hbm-fod-on-command-state",
-	"qcom,mdss-dsi-dispparam-hbm-fod-off-command-state",
+	"qcom,mdss-dsi-dispparam-hbm-on-command-state",
+	"qcom,mdss-dsi-dispparam-hbm-off-command-state",
 };
 
 static int dsi_panel_get_cmd_pkt_count(const char *data, u32 length, u32 *cnt)
@@ -3962,6 +4000,15 @@ int dsi_panel_set_nolp(struct dsi_panel *panel)
 	if (rc)
 		pr_err("[%s] failed to send DSI_CMD_SET_NOLP cmd, rc=%d\n",
 		       panel->name, rc);
+
+	/* Restore HBM mode when it is enabled by user */
+	if (panel->hbm_enabled) {
+		rc = dsi_panel_set_hbm(panel, true);
+		if (rc)
+			pr_err("[%s] unable to restore HBM mode, rc=%d\n",
+			       panel->name, rc);
+	}
+
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
@@ -4189,6 +4236,11 @@ int dsi_panel_enable(struct dsi_panel *panel)
 		       panel->name, rc);
 	}
 	panel->panel_initialized = true;
+
+	/* Restore HBM mode if enabled by user */
+	if (panel->hbm_enabled)
+		dsi_panel_set_hbm(panel, panel->hbm_enabled);
+
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
