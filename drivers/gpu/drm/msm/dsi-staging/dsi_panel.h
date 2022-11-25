@@ -108,6 +108,7 @@ struct dsi_backlight_config {
 	u32 bl_scale_ad;
 	u32 bl_doze_lpm;
 	u32 bl_doze_hbm;
+	u32 bl_dc_thresh;
 
 	int en_gpio;
 	bool dcs_type_ss;
@@ -233,6 +234,12 @@ struct dsi_panel {
 
 	struct brightness_alpha_pair *fod_dim_lut;
 	u32 fod_dim_lut_count;
+
+	struct brightness_alpha_pair *dc_dim_lut;
+	u32 dc_dim_lut_count;
+	u32 dc_dim_alpha;
+	u32 hw_bl_lvl;
+	bool dc_dimming;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)
@@ -334,7 +341,28 @@ int dsi_panel_parse_esd_reg_read_configs(struct dsi_panel *panel,
 
 void dsi_panel_ext_bridge_put(struct dsi_panel *panel);
 
+u32 dsi_panel_get_dc_dim_alpha(struct dsi_panel *panel);
+
 u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel);
+
+static inline bool dsi_panel_get_dc_dimming(struct dsi_panel *panel)
+{
+	bool status;
+
+	dsi_panel_acquire_panel_lock(panel);
+	status = panel->dc_dimming;
+	dsi_panel_release_panel_lock(panel);
+
+	return status;
+}
+
+static inline void dsi_panel_set_dc_dimming(struct dsi_panel *panel,
+					    bool enabled)
+{
+	dsi_panel_acquire_panel_lock(panel);
+	panel->dc_dimming = enabled;
+	dsi_panel_release_panel_lock(panel);
+}
 
 static inline bool dsi_panel_is_hbm_enabled(struct dsi_panel *panel)
 {
@@ -350,6 +378,7 @@ static inline bool dsi_panel_is_hbm_enabled(struct dsi_panel *panel)
 int dsi_panel_set_hbm_enabled(struct dsi_panel *panel, bool status);
 
 enum msm_dim_layer_type dsi_panel_update_dimlayer(struct dsi_panel *panel,
-						  enum msm_dim_layer_type type);
+						  enum msm_dim_layer_type type,
+						  u32 alpha);
 
 #endif /* _DSI_PANEL_H_ */
