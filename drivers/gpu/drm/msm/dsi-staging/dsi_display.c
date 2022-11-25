@@ -20,6 +20,9 @@
 #include <linux/of_gpio.h>
 #include <linux/err.h>
 
+#include <linux/msm_drm_notify.h>
+#include <linux/kernfs.h>
+
 #include "msm_drv.h"
 #include "sde_connector.h"
 #include "msm_mmu.h"
@@ -61,6 +64,8 @@ static const struct of_device_id dsi_display_dt_match[] = {
 
 static struct dsi_display *primary_display;
 static struct dsi_display *secondary_display;
+
+static struct kernfs_node *dsi_link;
 
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
@@ -975,6 +980,7 @@ int dsi_display_set_power(struct drm_connector *connector,
 		int power_mode, void *disp)
 {
 	struct dsi_display *display = disp;
+	struct msm_drm_notifier notify_data;
 	int rc = 0;
 
 	if (!display || !display->panel) {
@@ -982,17 +988,39 @@ int dsi_display_set_power(struct drm_connector *connector,
 		return -EINVAL;
 	}
 
+	notify_data.data = &power_mode;
+	notify_data.id = MSM_DRM_PRIMARY_DISPLAY;
+
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
+		msm_drm_notifier_call_chain(MSM_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp1(display->panel);
+		msm_drm_notifier_call_chain(MSM_DRM_EVENT_BLANK, &notify_data);
 		break;
 	case SDE_MODE_DPMS_LP2:
+		msm_drm_notifier_call_chain(MSM_DRM_EARLY_EVENT_BLANK, &notify_data);
 		rc = dsi_panel_set_lp2(display->panel);
+		msm_drm_notifier_call_chain(MSM_DRM_EVENT_BLANK, &notify_data);
 		break;
+	case SDE_MODE_DPMS_ON:
+		if (display->panel->power_mode == SDE_MODE_DPMS_LP1 ||
+			display->panel->power_mode == SDE_MODE_DPMS_LP2) {
+			msm_drm_notifier_call_chain(MSM_DRM_EARLY_EVENT_BLANK, &notify_data);
+			rc = dsi_panel_set_nolp(display->panel);
+			msm_drm_notifier_call_chain(MSM_DRM_EVENT_BLANK, &notify_data);
+        }
+		break;
+	case SDE_MODE_DPMS_OFF:
 	default:
-		rc = dsi_panel_set_nolp(display->panel);
-		break;
+		return rc;
 	}
+
+	pr_debug("Power mode transition from %d to %d %s",
+		 display->panel->power_mode, power_mode,
+		 rc ? "failed" : "successful");
+	if (!rc)
+		display->panel->power_mode = power_mode;
+
 	return rc;
 }
 
@@ -4696,18 +4724,84 @@ static struct attribute_group dynamic_dsi_clock_fs_attrs_group = {
 	.attrs = dynamic_dsi_clock_fs_attrs,
 };
 
+static ssize_t sysfs_fod_ui_read(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct dsi_display *display;
+	bool status;
+
+	display = dev_get_drvdata(dev);
+	if (!display) {
+		pr_err("Invalid display\n");
+		return -EINVAL;
+	}
+
+	status = atomic_read(&display->fod_ui);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", status);
+}
+
+static DEVICE_ATTR(fod_ui, 0444,
+			sysfs_fod_ui_read,
+			NULL);
+
+static struct attribute *display_fs_attrs[] = {
+	&dev_attr_fod_ui.attr,
+	NULL,
+};
+static struct attribute_group display_fs_attrs_group = {
+	.attrs = display_fs_attrs,
+};
+
 static int dsi_display_sysfs_init(struct dsi_display *display)
 {
 	int rc = 0;
 	struct device *dev = &display->pdev->dev;
+	struct device *soc_dev = dev->parent;
 
-	if (display->panel->panel_mode == DSI_OP_CMD_MODE)
+	if (!soc_dev)
+		pr_err("[%s] unable to determine parent device\n",
+		       display->name);
+	else {
+		struct kernfs_node *dsi_node = dev->kobj.sd;
+
+		kernfs_get(dsi_node);
+
+		dsi_link = kernfs_create_link(soc_dev->kobj.sd,
+					      "soc:qcom,dsi-display-primary",
+					      dsi_node);
+		if (IS_ERR_OR_NULL(dsi_link))
+			pr_err("[%s] unable to create dsi-display symlink\n",
+			       display->name);
+
+		kernfs_put(dsi_node);
+	}
+
+	rc = sysfs_create_group(&dev->kobj, &display_fs_attrs_group);
+	if (rc)
+		goto err_sysfs_disp_fs;
+
+	if (display->panel->panel_mode == DSI_OP_CMD_MODE) {
 		rc = sysfs_create_group(&dev->kobj,
 			&dynamic_dsi_clock_fs_attrs_group);
+		if (rc)
+			goto err_sysfs_dyn_dsi_clk;
+	}
+
 	pr_debug("[%s] dsi_display_sysfs_init:%d,panel mode:%d\n",
 		display->name, rc, display->panel->panel_mode);
 	return rc;
 
+err_sysfs_dyn_dsi_clk:
+	sysfs_remove_group(&dev->kobj, &display_fs_attrs_group);
+err_sysfs_disp_fs:
+	if (!IS_ERR_OR_NULL(dsi_link))
+		kernfs_remove_by_name(dsi_link->parent, dsi_link->name);
+
+	pr_err("[%s] failed to create display device attributes\n",
+	       display->name);
+
+	return rc;
 }
 
 static int dsi_display_sysfs_deinit(struct dsi_display *display)
@@ -4718,8 +4812,20 @@ static int dsi_display_sysfs_deinit(struct dsi_display *display)
 		sysfs_remove_group(&dev->kobj,
 			&dynamic_dsi_clock_fs_attrs_group);
 
+	sysfs_remove_group(&dev->kobj, &display_fs_attrs_group);
+
+	if (!IS_ERR_OR_NULL(dsi_link))
+		kernfs_remove_by_name(dsi_link->parent, dsi_link->name);
+
 	return 0;
 
+}
+
+void dsi_display_set_fod_ui(struct dsi_display *display, bool status)
+{
+	struct device *dev = &display->pdev->dev;
+	atomic_set(&display->fod_ui, status);
+	sysfs_notify(&dev->kobj, NULL, "fod_ui");
 }
 
 /**
@@ -4993,6 +5099,7 @@ static void dsi_display_unbind(struct device *dev,
 	}
 
 	atomic_set(&display->clkrate_change_pending, 0);
+	atomic_set(&display->fod_ui, false);
 	(void)dsi_display_sysfs_deinit(display);
 	(void)dsi_display_debugfs_deinit(display);
 
@@ -6892,6 +6999,10 @@ int dsi_display_unprepare(struct dsi_display *display)
 	mutex_unlock(&display->display_lock);
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT);
 	return rc;
+}
+
+struct dsi_display *get_main_display(void) {
+	return primary_display;
 }
 
 static int __init dsi_display_register(void)
