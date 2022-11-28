@@ -24,6 +24,7 @@ menu "Xiaomi board selection"
 	config MACH_XIAOMI_PYXIS
 		bool "Xiaomi pyxis board"
 		select MACH_XIAOMI_SDM710
+		select MACH_XIAOMI_PYXIS_OR_VELA
 		help
 		  Support for Mi CC 9/Mi 9 Lite
 
@@ -36,7 +37,11 @@ menu "Xiaomi board selection"
 	config MACH_XIAOMI_VELA
 		bool "Xiaomi vela board"
 		select MACH_XIAOMI_SDM710
+		select MACH_XIAOMI_PYXIS_OR_VELA
 		help
 		  Support for Mi CC 9 Meitu Edition
+
+	config MACH_XIAOMI_PYXIS_OR_VELA
+		bool
 
 endmenu
