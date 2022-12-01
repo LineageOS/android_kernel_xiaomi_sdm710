@@ -1,0 +1,12 @@
+#
+# Focaltech Touchscreen driver configuration
+#
+
+config TOUCHSCREEN_FTS_MI
+	tristate "Focaltech Touchscreen"
+	depends on I2C
+	default n
+	select TOUCHSCREEN_COMMON
+	help
+	  Say Y here if you have Focaltech touch panel.
+	  If unsure, say N.

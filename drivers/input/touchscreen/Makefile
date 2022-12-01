@@ -110,3 +110,6 @@ obj-$(CONFIG_TOUCHSCREEN_HIMAX_CHIPSET)	+= hxchipset/
 obj-$(CONFIG_TOUCHSCREEN_EKTF3XXX_CHIPSET) += ektf3xxx/
 obj-$(CONFIG_TOUCHSCREEN_RAYDIUM_CHIPSET)  += raydium_wt030/
 obj-$(CONFIG_TOUCHSCREEN_COMMON)	+= tp_common.o
+obj-$(CONFIG_TOUCHSCREEN_FTS_MI) += focaltech_touch_mi/
+obj-$(CONFIG_TOUCHSCREEN_ST_FTS_V521) += fts_521/
+obj-$(CONFIG_TOUCHSCREEN_GOODIX_GTX8) += tp_goodix_driver/

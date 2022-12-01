@@ -1461,4 +1461,8 @@ config TOUCHSCREEN_COMMON
 
 	  If unsure, say N.
 
+source "drivers/input/touchscreen/focaltech_touch_mi/Kconfig"
+source "drivers/input/touchscreen/fts_521/Kconfig"
+source "drivers/input/touchscreen/tp_goodix_driver/Kconfig"
+
 endif
