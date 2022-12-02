@@ -235,6 +235,16 @@ static int msm_config_group_get(struct pinctrl_dev *pctldev,
 	int ret;
 	u32 val;
 
+	/* bypass the NFC SPI gpios */
+	if (IS_ENABLED(CONFIG_MACH_XIAMI_PYXIS_OR_VELA) ||
+	    IS_ENABLED(CONFIG_MACH_XIAMI_GRUS))
+		if (group < 4)
+			return 0;
+
+	/* bypass the FingerPrint gpios */
+	if ((group > 80 && group < 85) || (group == 121))
+		return 0;
+
 	g = &pctrl->soc->groups[group];
 
 	ret = msm_config_reg(pctrl, g, param, &mask, &bit);
@@ -508,6 +518,16 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 	unsigned i;
 
 	for (i = 0; i < chip->ngpio; i++, gpio++) {
+		/* bypass the NFC SPI gpios */
+		if (IS_ENABLED(CONFIG_MACH_XIAMI_PYXIS_OR_VELA) ||
+		    IS_ENABLED(CONFIG_MACH_XIAMI_GRUS))
+			if (i < 4)
+				continue;
+
+		/* bypass the FingerPrint gpios */
+		if ((i > 80 && i < 85) || (i == 121))
+			continue;
+
 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
 		seq_puts(s, "\n");
 	}
