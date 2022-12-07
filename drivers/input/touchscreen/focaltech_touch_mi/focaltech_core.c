@@ -1,0 +1,1828 @@
+/*
+ *
+ * FocalTech TouchScreen driver.
+ *
+ * Copyright (c) 2010-2017, FocalTech Systems, Ltd., all rights reserved.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+/*****************************************************************************
+*
+* File Name: focaltech_core.c
+*
+* Author: Focaltech Driver Team
+*
+* Created: 2016-08-08
+*
+* Abstract: entrance for focaltech ts driver
+*
+* Version: V1.0
+*
+*****************************************************************************/
+
+/*****************************************************************************
+* Included header files
+*****************************************************************************/
+#include "focaltech_core.h"
+#if defined(CONFIG_DRM)
+#include <linux/notifier.h>
+#include <linux/fb.h>
+#include <linux/msm_drm_notify.h>
+#endif
+#include <linux/backlight.h>
+#include <linux/input/tp_common.h>
+
+/*****************************************************************************
+* Private constant and macro definitions using #define
+*****************************************************************************/
+#define FTS_DRIVER_NAME                     "fts_ts"
+#define INTERVAL_READ_REG                   100	/* unit:ms */
+#define TIMEOUT_READ_REG                    2000	/* unit:ms */
+#define FTS_VTG_MIN_UV                      2600000
+#define FTS_VTG_MAX_UV                      3300000
+#define FTS_I2C_VTG_MIN_UV                  1800000
+#define FTS_I2C_VTG_MAX_UV                  1800000
+
+/*****************************************************************************
+* Global variable or extern global variabls/functions
+*****************************************************************************/
+struct fts_ts_data *fts_data;
+extern int fts_charger_mode_set(struct i2c_client *client, bool on);
+
+/*****************************************************************************
+* Static function prototypes
+*****************************************************************************/
+static void fts_release_all_finger(void);
+static int fts_ts_suspend(struct device *dev);
+static int fts_ts_resume(struct device *dev);
+static void fts_resume_work(struct work_struct *work);
+static void fts_suspend_work(struct work_struct *work);
+
+struct device *fts_get_dev(void)
+{
+	if (!fts_data)
+		return NULL;
+	else
+		return &(fts_data->client->dev);
+}
+/*****************************************************************************
+*  Name: fts_wait_tp_to_valid
+*  Brief: Read chip id until TP FW become valid(Timeout: TIMEOUT_READ_REG),
+*         need call when reset/power on/resume...
+*  Input:
+*  Output:
+*  Return: return 0 if tp valid, otherwise return error code
+*****************************************************************************/
+int fts_wait_tp_to_valid(struct i2c_client *client)
+{
+	int ret = 0;
+	int cnt = 0;
+	u8 reg_value = 0;
+	u8 chip_id = fts_data->ic_info.ids.chip_idh;
+
+	do {
+		ret = fts_i2c_read_reg(client, FTS_REG_CHIP_ID, &reg_value);
+		if ((ret < 0) || (reg_value != chip_id)) {
+			FTS_DEBUG("TP Not Ready, ReadData = 0x%x", reg_value);
+		} else if (reg_value == chip_id) {
+			FTS_INFO("TP Ready, Device ID = 0x%x", reg_value);
+			return 0;
+		}
+		cnt++;
+		msleep(INTERVAL_READ_REG);
+	} while ((cnt * INTERVAL_READ_REG) < TIMEOUT_READ_REG);
+
+	return -EIO;
+}
+
+/************************************************************************
+* Name: fts_get_chip_types
+* Brief: verity chip id and get chip type data
+* Input:
+* Output:
+* Return: return 0 if success, otherwise return error code
+***********************************************************************/
+static int fts_get_chip_types(struct fts_ts_data *ts_data, u8 id_h, u8 id_l, bool fw_valid)
+{
+	int i = 0;
+	struct ft_chip_t ctype[] = FTS_CHIP_TYPE_MAPPING;
+	u32 ctype_entries = sizeof(ctype) / sizeof(struct ft_chip_t);
+
+	if ((0x0 == id_h) || (0x0 == id_l)) {
+		FTS_ERROR("id_h/id_l is 0");
+		return -EINVAL;
+	}
+
+	FTS_DEBUG("verify id:0x%02x%02x", id_h, id_l);
+	for (i = 0; i < ctype_entries; i++) {
+		if (VALID == fw_valid) {
+			if ((id_h == ctype[i].chip_idh) && (id_l == ctype[i].chip_idl))
+				break;
+		} else {
+			if (((id_h == ctype[i].rom_idh) && (id_l == ctype[i].rom_idl))
+			    || ((id_h == ctype[i].pb_idh) && (id_l == ctype[i].pb_idl))
+			    || ((id_h == ctype[i].bl_idh) && (id_l == ctype[i].bl_idl)))
+				break;
+		}
+	}
+
+	if (i >= ctype_entries) {
+		return -ENODATA;
+	}
+
+	ts_data->ic_info.ids = ctype[i];
+	return 0;
+}
+
+/*****************************************************************************
+*  Name: fts_get_ic_information
+*  Brief:
+*  Input:
+*  Output:
+*  Return: return 0 if success, otherwise return error code
+*****************************************************************************/
+static int fts_get_ic_information(struct fts_ts_data *ts_data)
+{
+	int ret = 0;
+	int cnt = 0;
+	u8 chip_id[2] = { 0 };
+	u8 id_cmd[4] = { 0 };
+	u32 id_cmd_len = 0;
+	struct i2c_client *client = ts_data->client;
+
+	ts_data->ic_info.is_incell = FTS_CHIP_IDC;
+	ts_data->ic_info.hid_supported = FTS_HID_SUPPORTTED;
+	do {
+		ret = fts_i2c_read_reg(client, FTS_REG_CHIP_ID, &chip_id[0]);
+		ret = fts_i2c_read_reg(client, FTS_REG_CHIP_ID2, &chip_id[1]);
+		if ((ret < 0) || (0x0 == chip_id[0]) || (0x0 == chip_id[1])) {
+			FTS_DEBUG("i2c read invalid, read:0x%02x%02x", chip_id[0], chip_id[1]);
+		} else {
+			ret = fts_get_chip_types(ts_data, chip_id[0], chip_id[1], VALID);
+			if (!ret)
+				break;
+			else
+				FTS_DEBUG("TP not ready, read:0x%02x%02x", chip_id[0], chip_id[1]);
+		}
+
+		cnt++;
+		msleep(INTERVAL_READ_REG);
+	} while ((cnt * INTERVAL_READ_REG) < TIMEOUT_READ_REG);
+
+	if ((cnt * INTERVAL_READ_REG) >= TIMEOUT_READ_REG) {
+		FTS_INFO("fw is invalid, need read boot id");
+		if (ts_data->ic_info.hid_supported) {
+			fts_i2c_hid2std(client);
+		}
+
+		id_cmd[0] = FTS_CMD_START1;
+		id_cmd[1] = FTS_CMD_START2;
+		ret = fts_i2c_write(client, id_cmd, 2);
+		if (ret < 0) {
+			FTS_ERROR("start cmd write fail");
+			return ret;
+		}
+
+		msleep(FTS_CMD_START_DELAY);
+		id_cmd[0] = FTS_CMD_READ_ID;
+		id_cmd[1] = id_cmd[2] = id_cmd[3] = 0x00;
+		if (ts_data->ic_info.is_incell)
+			id_cmd_len = FTS_CMD_READ_ID_LEN_INCELL;
+		else
+			id_cmd_len = FTS_CMD_READ_ID_LEN;
+		ret = fts_i2c_read(client, id_cmd, id_cmd_len, chip_id, 2);
+		if ((ret < 0) || (0x0 == chip_id[0]) || (0x0 == chip_id[1])) {
+			FTS_ERROR("read boot id fail");
+			return -EIO;
+		}
+		ret = fts_get_chip_types(ts_data, chip_id[0], chip_id[1], INVALID);
+		if (ret < 0) {
+			FTS_ERROR("can't get ic informaton");
+			return ret;
+		}
+	}
+	FTS_INFO("get ic information, chip id = 0x%02x%02x", ts_data->ic_info.ids.chip_idh,
+		 ts_data->ic_info.ids.chip_idl);
+
+	return 0;
+}
+
+/*****************************************************************************
+*  Name: fts_tp_state_recovery
+*  Brief: Need execute this function when reset
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+void fts_tp_state_recovery(struct i2c_client *client)
+{
+	FTS_FUNC_ENTER();
+	/* wait tp stable */
+	fts_wait_tp_to_valid(client);
+	/* recover TP charger state 0x8B */
+	/* recover TP glove state 0xC0 */
+	/* recover TP cover state 0xC1 */
+	fts_ex_mode_recovery(client);
+	/* recover TP fod/gesture state 0xCF & 0xD0 */
+	fts_fod_gesture_recovery(client);
+	FTS_FUNC_EXIT();
+}
+
+/*****************************************************************************
+*  Name: fts_reset_proc
+*  Brief: Execute reset operation
+*  Input: hdelayms - delay time unit:ms
+*  Output:
+*  Return:
+*****************************************************************************/
+int fts_reset_proc(int hdelayms)
+{
+	FTS_FUNC_ENTER();
+	gpio_direction_output(fts_data->pdata->reset_gpio, 0);
+	msleep(20);
+	gpio_direction_output(fts_data->pdata->reset_gpio, 1);
+	if (hdelayms) {
+		msleep(hdelayms);
+	}
+
+	FTS_FUNC_EXIT();
+	return 0;
+}
+
+/*****************************************************************************
+*  Name: fts_irq_disable
+*  Brief: disable irq
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+void fts_irq_disable(void)
+{
+	unsigned long irqflags;
+
+	FTS_FUNC_ENTER();
+	spin_lock_irqsave(&fts_data->irq_lock, irqflags);
+
+	if (!fts_data->irq_disabled) {
+		disable_irq_nosync(fts_data->irq);
+		fts_data->irq_disabled = true;
+	}
+
+	spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
+	FTS_FUNC_EXIT();
+}
+
+/*****************************************************************************
+*  Name: fts_irq_disable sync
+*  Brief: disable irq sync
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+void fts_irq_disable_sync(void)
+{
+
+	if (!fts_data->irq_disabled) {
+		disable_irq(fts_data->irq);
+		FTS_INFO("irq is disabled\n");
+		fts_data->irq_disabled = true;
+	}
+
+}
+
+
+/*****************************************************************************
+*  Name: fts_irq_enable
+*  Brief: enable irq
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+void fts_irq_enable(void)
+{
+	unsigned long irqflags = 0;
+
+	spin_lock_irqsave(&fts_data->irq_lock, irqflags);
+
+	if (fts_data->irq_disabled) {
+		enable_irq(fts_data->irq);
+		FTS_INFO("irq is enabled\n");
+		fts_data->irq_disabled = false;
+	}
+	spin_unlock_irqrestore(&fts_data->irq_lock, irqflags);
+
+}
+
+/*****************************************************************************
+* Power Control
+*****************************************************************************/
+static int fts_power_source_init(struct fts_ts_data *data)
+{
+	int ret = 0;
+
+	FTS_FUNC_ENTER();
+
+	data->vddio = regulator_get(&data->client->dev, "vddio");
+	if (IS_ERR(data->vddio)) {
+		ret = PTR_ERR(data->vddio);
+		FTS_ERROR("get vddio regulator failed,ret=%d", ret);
+		return ret;
+	}
+
+	if (regulator_count_voltages(data->vddio) > 0) {
+		ret = regulator_set_voltage(data->vddio, FTS_I2C_VTG_MIN_UV, FTS_I2C_VTG_MAX_UV);
+		if (ret) {
+			FTS_ERROR("vdd regulator set_vddio failed ret=%d", ret);
+			goto err_set_vtg_vdd;
+		}
+	}
+
+	data->avdd = regulator_get(&data->client->dev, "avdd");
+	if (IS_ERR(data->avdd)) {
+		ret = PTR_ERR(data->avdd);
+		FTS_ERROR("get vddio regulator failed,ret=%d", ret);
+		return ret;
+	}
+	regulator_set_load(data->avdd, data->pdata->avdd_load);
+
+	data->vsp = regulator_get(&data->client->dev, "lab");
+	if (IS_ERR(data->vsp)) {
+		ret = PTR_ERR(data->vsp);
+		FTS_ERROR("ret vsp regulator failed,ret=%d", ret);
+		goto err_get_vsp;
+	}
+
+	data->vsn = regulator_get(&data->client->dev, "ibb");
+	if (IS_ERR(data->vsn)) {
+		ret = PTR_ERR(data->vsn);
+		FTS_ERROR("ret vsn regulator failed,ret=%d", ret);
+		goto err_get_vsn;
+	}
+
+	FTS_FUNC_EXIT();
+	return 0;
+
+err_get_vsn:
+	regulator_put(data->vsp);
+err_get_vsp:
+err_set_vtg_vdd:
+	regulator_put(data->vddio);
+
+	FTS_FUNC_EXIT();
+	return ret;
+}
+
+static int fts_power_source_release(struct fts_ts_data *data)
+{
+	if (regulator_count_voltages(data->vddio) > 0)
+		regulator_set_voltage(data->vddio, 0, FTS_I2C_VTG_MAX_UV);
+	regulator_put(data->vddio);
+
+	regulator_put(data->vsp);
+
+	regulator_put(data->vsn);
+
+	return 0;
+}
+
+static int fts_power_source_ctrl(struct fts_ts_data *data, int enable)
+{
+	int ret = 0;
+
+	FTS_FUNC_ENTER();
+	if (enable) {
+		if (data->power_disabled) {
+			ret = regulator_enable(data->avdd);
+			if (ret) {
+				FTS_ERROR("enable avdd regulator failed,ret=%d", ret);
+			}
+			ret = regulator_enable(data->vddio);
+			if (ret) {
+				FTS_ERROR("enable vddio regulator failed,ret=%d", ret);
+			}
+
+			ret = regulator_enable(data->vsp);
+			if (ret) {
+				FTS_ERROR("enable vsp regulator failed,ret=%d", ret);
+			}
+
+			ret = regulator_enable(data->vsn);
+			if (ret) {
+				FTS_ERROR("enable vsn regulator failed,ret=%d", ret);
+			}
+			data->power_disabled = false;
+		}
+	} else {
+		if (!data->power_disabled) {
+			ret = regulator_disable(data->avdd);
+			if (ret) {
+				FTS_ERROR("disable avdd regulator failed,ret=%d", ret);
+			}
+			ret = regulator_disable(data->vddio);
+			if (ret) {
+				FTS_ERROR("disable vddio regulator failed,ret=%d", ret);
+			}
+
+			ret = regulator_disable(data->vsp);
+			if (ret) {
+				FTS_ERROR("disable vsp regulator failed,ret=%d", ret);
+			}
+
+			ret = regulator_disable(data->vsn);
+			if (ret) {
+				FTS_ERROR("disable vsn regulator failed,ret=%d", ret);
+			}
+
+			data->power_disabled = true;
+		}
+	}
+
+	FTS_FUNC_EXIT();
+	return ret;
+}
+
+/*****************************************************************************
+*  Name: fts_pinctrl_init
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_pinctrl_init(struct fts_ts_data *ts)
+{
+	int ret = 0;
+	struct i2c_client *client = ts->client;
+
+	ts->pinctrl = devm_pinctrl_get(&client->dev);
+	if (IS_ERR_OR_NULL(ts->pinctrl)) {
+		FTS_ERROR("Failed to get pinctrl, please check dts");
+		ret = PTR_ERR(ts->pinctrl);
+		goto err_pinctrl_get;
+	}
+
+	ts->pins_active = pinctrl_lookup_state(ts->pinctrl, "pmx_ts_active");
+	if (IS_ERR_OR_NULL(ts->pins_active)) {
+		FTS_ERROR("Pin state[active] not found");
+		ret = PTR_ERR(ts->pins_active);
+		goto err_pinctrl_lookup;
+	}
+
+	ts->pins_suspend = pinctrl_lookup_state(ts->pinctrl, "pmx_ts_suspend");
+	if (IS_ERR_OR_NULL(ts->pins_suspend)) {
+		FTS_ERROR("Pin state[suspend] not found");
+		ret = PTR_ERR(ts->pins_suspend);
+		goto err_pinctrl_lookup;
+	}
+
+	ts->pins_release = pinctrl_lookup_state(ts->pinctrl, "pmx_ts_release");
+	if (IS_ERR_OR_NULL(ts->pins_release)) {
+		FTS_ERROR("Pin state[release] not found");
+		ret = PTR_ERR(ts->pins_release);
+	}
+
+	return 0;
+err_pinctrl_lookup:
+	if (ts->pinctrl) {
+		devm_pinctrl_put(ts->pinctrl);
+	}
+err_pinctrl_get:
+	ts->pinctrl = NULL;
+	ts->pins_release = NULL;
+	ts->pins_suspend = NULL;
+	ts->pins_active = NULL;
+	return ret;
+}
+
+static int fts_pinctrl_select_normal(struct fts_ts_data *ts)
+{
+	int ret = 0;
+
+	if (ts->pinctrl && ts->pins_active) {
+		ret = pinctrl_select_state(ts->pinctrl, ts->pins_active);
+		if (ret < 0) {
+			FTS_ERROR("Set normal pin state error:%d", ret);
+		}
+	}
+
+	return ret;
+}
+
+static int fts_pinctrl_select_suspend(struct fts_ts_data *ts)
+{
+	int ret = 0;
+
+	if (ts->pinctrl && ts->pins_suspend) {
+		ret = pinctrl_select_state(ts->pinctrl, ts->pins_suspend);
+		if (ret < 0) {
+			FTS_ERROR("Set suspend pin state error:%d", ret);
+		}
+	}
+
+	return ret;
+}
+
+static int fts_pinctrl_select_release(struct fts_ts_data *ts)
+{
+	int ret = 0;
+
+	if (ts->pinctrl) {
+		if (IS_ERR_OR_NULL(ts->pins_release)) {
+			devm_pinctrl_put(ts->pinctrl);
+			ts->pinctrl = NULL;
+		} else {
+			ret = pinctrl_select_state(ts->pinctrl, ts->pins_release);
+			if (ret < 0)
+				FTS_ERROR("Set gesture pin state error:%d", ret);
+		}
+	}
+
+	return ret;
+}
+
+/*****************************************************************************
+*  Reprot related
+*****************************************************************************/
+#if (FTS_DEBUG_EN && (FTS_DEBUG_LEVEL == 2))
+char g_sz_debug[1024] = { 0 };
+
+static void fts_show_touch_buffer(u8 *buf, int point_num)
+{
+	int len = point_num * FTS_ONE_TCH_LEN;
+	int count = 0;
+	int i;
+
+	memset(g_sz_debug, 0, 1024);
+	if (len > (fts_data->pnt_buf_size - 3)) {
+		len = fts_data->pnt_buf_size - 3;
+	} else if (len == 0) {
+		len += FTS_ONE_TCH_LEN;
+	}
+	count += snprintf(g_sz_debug, PAGE_SIZE, "%02X,%02X,%02X", buf[0], buf[1], buf[2]);
+	for (i = 0; i < len; i++) {
+		count += snprintf(g_sz_debug + count, PAGE_SIZE, ",%02X", buf[i + 3]);
+	}
+	FTS_DEBUG("buffer: %s", g_sz_debug);
+}
+#endif
+
+/*****************************************************************************
+ *  Name: fts_release_all_finger
+ *  Brief: report all points' up events, release touch
+ *  Input:
+ *  Output:
+ *  Return:
+ *****************************************************************************/
+static void fts_release_all_finger(void)
+{
+	struct input_dev *input_dev = fts_data->input_dev;
+	u32 finger_count = 0;
+
+	FTS_FUNC_ENTER();
+
+	fts_data->finger_in_fod = false;
+	fts_data->fod_x = 0;
+	fts_data->fod_y = 0;
+
+	for (finger_count = 0; finger_count < fts_data->pdata->max_touch_number; finger_count++) {
+		input_mt_slot(input_dev, finger_count);
+		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
+	}
+	input_report_key(input_dev, BTN_TOUCH, 0);
+	input_sync(input_dev);
+	FTS_FUNC_EXIT();
+}
+
+/************************************************************************
+ * Name: fts_input_report_key
+ * Brief: report key event
+ * Input: events info
+ * Output:
+ * Return: return 0 if success
+ ***********************************************************************/
+static int fts_input_report_key(struct fts_ts_data *data, int index)
+{
+	u32 ik;
+	int id = data->events[index].id;
+	int x = data->events[index].x;
+	int y = data->events[index].y;
+	int flag = data->events[index].flag;
+	u32 key_num = data->pdata->key_number;
+
+	if (!KEY_EN(data)) {
+		return -EINVAL;
+	}
+	for (ik = 0; ik < key_num; ik++) {
+		if (TOUCH_IN_KEY(x, data->pdata->key_x_coords[ik])) {
+			if (EVENT_DOWN(flag)) {
+				input_report_key(data->input_dev, data->pdata->keys[ik], 1);
+				FTS_DEBUG("Key%d(%d, %d) DOWN!", ik, x, y);
+			} else {
+				input_report_key(data->input_dev, data->pdata->keys[ik], 0);
+				FTS_DEBUG("Key%d(%d, %d) Up!", ik, x, y);
+			}
+			return 0;
+		}
+	}
+
+	FTS_ERROR("invalid touch for key, [%d](%d, %d)", id, x, y);
+	return -EINVAL;
+}
+
+static void fts_report_event(struct fts_ts_data *data)
+{
+	int i = 0;
+	int uppoint = 0;
+	int touchs = 0;
+	bool va_reported = false;
+	u32 max_touch_num = data->pdata->max_touch_number;
+	u32 key_y_coor = data->pdata->key_y_coord;
+	struct ts_event *events = data->events;
+
+	if (!data->fod_point_released && data->point_num == 0) {
+		fts_release_all_finger();
+		FTS_INFO("%s Normal report release all fingers\n", __func__);
+		data->fod_point_released = true;
+	}
+
+	for (i = 0; i < data->touch_point; i++) {
+		if (KEY_EN(data) && TOUCH_IS_KEY(events[i].y, key_y_coor)) {
+			fts_input_report_key(data, i);
+			continue;
+		}
+
+		if (events[i].id >= max_touch_num)
+			break;
+
+		va_reported = true;
+		input_mt_slot(data->input_dev, events[i].id);
+
+		if (EVENT_DOWN(events[i].flag)) {
+			input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, true);
+
+			if (events[i].p <= 0) {
+				events[i].p = 0x3f;
+			}
+			input_report_abs(data->input_dev, ABS_MT_PRESSURE, events[i].p);
+			if (events[i].area <= 0) {
+				events[i].area = 0x09;
+			}
+			input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR,
+					 events[i].area);
+			input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
+			input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
+
+			touchs |= BIT(events[i].id);
+			data->touchs |= BIT(events[i].id);
+
+			/*FTS_DEBUG("[B]P%d(%d, %d)[p:%d,tm:%d] DOWN!", events[i].id, events[i].x,
+			   events[i].y, events[i].p, events[i].area); */
+		} else {
+			uppoint++;
+			input_report_abs(data->input_dev, ABS_MT_PRESSURE, 0);
+			input_mt_report_slot_state(data->input_dev,
+						MT_TOOL_FINGER, false);
+			data->touchs &= ~BIT(events[i].id);
+			FTS_DEBUG("[B]P%d UP!", events[i].id);
+		}
+	}
+
+	if (unlikely(data->touchs ^ touchs)) {
+		for (i = 0; i < max_touch_num; i++) {
+			if (BIT(i) & (data->touchs ^ touchs)) {
+				/*FTS_DEBUG("[B]P%d UP!", i); */
+				va_reported = true;
+				input_mt_slot(data->input_dev, i);
+				input_mt_report_slot_state(data->input_dev, MT_TOOL_FINGER, false);
+			}
+		}
+	}
+	data->touchs = touchs;
+
+	if (va_reported) {
+		/* touchs==0, there's no point but key */
+		if (EVENT_NO_DOWN(data) || (!touchs)) {
+			/*FTS_DEBUG("[B]Points All Up!"); */
+			input_report_key(data->input_dev, BTN_TOUCH, 0);
+		} else {
+			input_report_key(data->input_dev, BTN_TOUCH, 1);
+		}
+	}
+
+	input_sync(data->input_dev);
+}
+
+/*****************************************************************************
+*  Name: fts_read_touchdata
+*  Brief:
+*  Input:
+*  Output:
+*  Return: return 0 if succuss
+*****************************************************************************/
+static int fts_read_touchdata(struct fts_ts_data *data)
+{
+	int ret = 0;
+	int i = 0;
+	u8 pointid;
+	int base;
+	struct ts_event *events = data->events;
+	int max_touch_num = data->pdata->max_touch_number;
+	u8 *buf = data->point_buf;
+	struct i2c_client *client = data->client;
+	u8 reg_value;
+
+	if (fts_fod_gesture_readdata(data) == 0) {
+		FTS_INFO("succeeded to get fod/gesture data");
+		ret = fts_i2c_read_reg(fts_data->client, FTS_REG_INT_ACK, &reg_value);
+		if (ret < 0)
+			FTS_ERROR("read int ack error");
+		else
+			return 1;
+	}
+
+	data->point_num = 0;
+	data->touch_point = 0;
+
+	memset(buf, 0xFF, data->pnt_buf_size);
+	buf[0] = 0x00;
+
+	ret = fts_i2c_read(data->client, buf, 1, buf, data->pnt_buf_size);
+	if (ret < 0) {
+		FTS_ERROR("read touchdata failed, ret:%d", ret);
+		return ret;
+	}
+	data->point_num = buf[FTS_TOUCH_POINT_NUM] & 0x0F;
+
+	if ((data->point_num == 0x0F) && (buf[1] == 0xFF) && (buf[2] == 0xFF)
+		&& (buf[3] == 0xFF) && (buf[4] == 0xFF) && (buf[5] == 0xFF) && (buf[6] == 0xFF)) {
+		FTS_INFO("touch buff is 0xff, need recovery state");
+		fts_tp_state_recovery(client);
+		return -EIO;
+	}
+
+	if (data->point_num > max_touch_num) {
+		FTS_INFO("invalid point_num(%d)", data->point_num);
+		data->point_num = max_touch_num;
+		return -EIO;
+	}
+#if (FTS_DEBUG_EN && (FTS_DEBUG_LEVEL == 2))
+	fts_show_touch_buffer(buf, data->point_num);
+#endif
+
+	for (i = 0; i < max_touch_num; i++) {
+		base = FTS_ONE_TCH_LEN * i;
+
+		pointid = (buf[FTS_TOUCH_ID_POS + base]) >> 4;
+		if (pointid >= FTS_MAX_ID)
+			break;
+		else if (pointid >= max_touch_num) {
+			FTS_ERROR("ID(%d) beyond max_touch_number", pointid);
+			return -EINVAL;
+		}
+
+		data->touch_point++;
+		events[i].x = ((buf[FTS_TOUCH_X_H_POS + base] & 0x0F) << 8) + (buf[FTS_TOUCH_X_L_POS + base] & 0xFF);
+		events[i].y = ((buf[FTS_TOUCH_Y_H_POS + base] & 0x0F) << 8) + (buf[FTS_TOUCH_Y_L_POS + base] & 0xFF);
+		events[i].flag = buf[FTS_TOUCH_EVENT_POS + base] >> 6;
+		events[i].id = buf[FTS_TOUCH_ID_POS + base] >> 4;
+		events[i].area = buf[FTS_TOUCH_AREA_POS + base] >> 4;
+		events[i].p = buf[FTS_TOUCH_PRE_POS + base];
+
+		if (EVENT_DOWN(events[i].flag) && (data->point_num == 0)) {
+			FTS_INFO("abnormal touch data from fw");
+			return -EIO;
+		}
+	}
+	if (data->touch_point == 0) {
+		FTS_INFO("no touch point information");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/*****************************************************************************
+*  Name: fts_ts_interrupt
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static irqreturn_t fts_ts_interrupt(int irq, void *data)
+{
+	int ret = 0;
+	struct fts_ts_data *ts_data = (struct fts_ts_data *)data;
+
+	if (!ts_data) {
+		FTS_ERROR("[INTR]: Invalid fts_ts_data");
+		return IRQ_HANDLED;
+	}
+
+#ifdef CONFIG_PM
+	if (ts_data->dev_pm_suspend) {
+		unsigned long timeout = msecs_to_jiffies(FTS_RESUME_TIMEOUT);
+
+		ret = wait_for_completion_timeout(&ts_data->pm_completion,
+						 timeout);
+		if (!ret) {
+			FTS_ERROR("I2C bus resume timeout, skipping IRQ");
+			return IRQ_HANDLED;
+		}
+	}
+#endif
+	ret = fts_read_touchdata(ts_data);
+	if (ret == 0) {
+		mutex_lock(&ts_data->report_mutex);
+		fts_report_event(ts_data);
+		mutex_unlock(&ts_data->report_mutex);
+	}
+
+	return IRQ_HANDLED;
+}
+
+/*****************************************************************************
+*  Name: fts_irq_registration
+*  Brief:
+*  Input:
+*  Output:
+*  Return: return 0 if succuss, otherwise return error code
+*****************************************************************************/
+static int fts_irq_registration(struct fts_ts_data *ts_data)
+{
+	int ret = 0;
+	struct fts_ts_platform_data *pdata = ts_data->pdata;
+
+	ts_data->irq = gpio_to_irq(pdata->irq_gpio);
+	FTS_INFO("irq in ts_data:%d irq in client:%d", ts_data->irq, ts_data->client->irq);
+	if (ts_data->irq != ts_data->client->irq)
+		FTS_ERROR("IRQs are inconsistent, please check <interrupts> & <focaltech,irq-gpio> in DTS");
+
+	if (0 == pdata->irq_gpio_flags)
+		pdata->irq_gpio_flags = IRQF_TRIGGER_FALLING;
+	FTS_INFO("irq flag:%x", pdata->irq_gpio_flags);
+	ret =
+	    request_threaded_irq(ts_data->irq, NULL, fts_ts_interrupt, pdata->irq_gpio_flags | IRQF_ONESHOT,
+				 ts_data->client->name, ts_data);
+
+	return ret;
+}
+
+/*****************************************************************************
+*  Name: fts_input_init
+*  Brief: input device init
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_input_init(struct fts_ts_data *ts_data)
+{
+	int ret = 0;
+	int key_num = 0;
+	struct fts_ts_platform_data *pdata = ts_data->pdata;
+	struct input_dev *input_dev;
+	int point_num;
+
+	FTS_FUNC_ENTER();
+
+	input_dev = input_allocate_device();
+	if (!input_dev) {
+		FTS_ERROR("Failed to allocate memory for input device");
+		return -ENOMEM;
+	}
+
+	/* Init and register Input device */
+	input_dev->name = FTS_DRIVER_NAME;
+	input_dev->id.bustype = BUS_I2C;
+	input_dev->dev.parent = &ts_data->client->dev;
+	input_set_drvdata(input_dev, ts_data);
+
+	if (pdata->have_key) {
+		FTS_INFO("set key capabilities");
+		for (key_num = 0; key_num < pdata->key_number; key_num++)
+			input_set_capability(input_dev, EV_KEY, pdata->keys[key_num]);
+	}
+	input_mt_init_slots(input_dev, pdata->max_touch_number, INPUT_MT_DIRECT);
+	input_set_abs_params(input_dev, ABS_MT_POSITION_X, pdata->x_min, pdata->x_max - 1, 0, 0);
+	input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->y_min, pdata->y_max - 1, 0, 0);
+	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 0xFF, 0, 0);
+	input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
+	input_set_capability(input_dev, EV_KEY, BTN_INFO);
+	input_set_capability(input_dev, EV_KEY, KEY_GOTO);
+	input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
+
+	point_num = pdata->max_touch_number;
+	ts_data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;
+	ts_data->point_buf = (u8 *) kzalloc(ts_data->pnt_buf_size, GFP_KERNEL);
+	if (!ts_data->point_buf) {
+		FTS_ERROR("failed to alloc memory for point buf!");
+		ret = -ENOMEM;
+		goto err_point_buf;
+	}
+
+	ts_data->events = (struct ts_event *)kzalloc(point_num * sizeof(struct ts_event), GFP_KERNEL);
+	if (!ts_data->events) {
+
+		FTS_ERROR("failed to alloc memory for point events!");
+		ret = -ENOMEM;
+		goto err_event_buf;
+	}
+	ret = input_register_device(input_dev);
+	if (ret) {
+		FTS_ERROR("Input device registration failed");
+		goto err_input_reg;
+	}
+
+	ts_data->input_dev = input_dev;
+
+	FTS_FUNC_EXIT();
+	return 0;
+
+err_input_reg:
+	kfree_safe(ts_data->events);
+
+err_event_buf:
+	kfree_safe(ts_data->point_buf);
+
+err_point_buf:
+	input_set_drvdata(input_dev, NULL);
+	input_free_device(input_dev);
+	input_dev = NULL;
+
+	FTS_FUNC_EXIT();
+	return ret;
+}
+
+/*****************************************************************************
+*  Name: fts_gpio_configure
+*  Brief: Configure IRQ&RESET GPIO
+*  Input:
+*  Output:
+*  Return: return 0 if succuss
+*****************************************************************************/
+static int fts_gpio_configure(struct fts_ts_data *data)
+{
+	int ret = 0;
+
+	FTS_FUNC_ENTER();
+	/* request irq gpio */
+	if (gpio_is_valid(data->pdata->irq_gpio)) {
+		ret = gpio_request(data->pdata->irq_gpio, "fts_irq_gpio");
+		if (ret) {
+			FTS_ERROR("[GPIO]irq gpio request failed");
+			goto err_irq_gpio_req;
+		}
+
+		ret = gpio_direction_input(data->pdata->irq_gpio);
+		if (ret) {
+			FTS_ERROR("[GPIO]set_direction for irq gpio failed");
+			goto err_irq_gpio_dir;
+		}
+	}
+
+	/* request reset gpio */
+	if (gpio_is_valid(data->pdata->reset_gpio)) {
+		ret = gpio_request(data->pdata->reset_gpio, "fts_reset_gpio");
+		if (ret) {
+			FTS_ERROR("[GPIO]reset gpio request failed");
+			goto err_irq_gpio_dir;
+		}
+
+		ret = gpio_direction_output(data->pdata->reset_gpio, 0);
+		if (ret) {
+			FTS_ERROR("[GPIO]set_direction for reset gpio failed");
+			goto err_reset_gpio_dir;
+		}
+
+		msleep(20);
+
+		ret = gpio_direction_output(data->pdata->reset_gpio, 1);
+		if (ret) {
+			FTS_ERROR("[GPIO]set_direction for reset gpio failed");
+			goto err_reset_gpio_dir;
+		}
+	}
+
+	FTS_FUNC_EXIT();
+	return 0;
+
+err_reset_gpio_dir:
+	if (gpio_is_valid(data->pdata->reset_gpio))
+		gpio_free(data->pdata->reset_gpio);
+err_irq_gpio_dir:
+	if (gpio_is_valid(data->pdata->irq_gpio))
+		gpio_free(data->pdata->irq_gpio);
+err_irq_gpio_req:
+	FTS_FUNC_EXIT();
+	return ret;
+}
+
+/*****************************************************************************
+*  Name: fts_get_dt_coords
+*  Brief:
+*  Input:
+*  Output:
+*  Return: return 0 if succuss, otherwise return error code
+*****************************************************************************/
+static int fts_get_dt_coords(struct device *dev, char *name, struct fts_ts_platform_data *pdata)
+{
+	int ret = 0;
+	u32 coords[FTS_COORDS_ARR_SIZE] = { 0 };
+	struct property *prop;
+	struct device_node *np = dev->of_node;
+	int coords_size;
+
+	prop = of_find_property(np, name, NULL);
+	if (!prop)
+		return -EINVAL;
+	if (!prop->value)
+		return -ENODATA;
+
+	coords_size = prop->length / sizeof(u32);
+	if (coords_size != FTS_COORDS_ARR_SIZE) {
+		FTS_ERROR("invalid:%s, size:%d", name, coords_size);
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32_array(np, name, coords, coords_size);
+	if (ret && (ret != -EINVAL)) {
+		FTS_ERROR("Unable to read %s", name);
+		return -ENODATA;
+	}
+
+	if (!strcmp(name, "focaltech,display-coords")) {
+		pdata->x_min = coords[0];
+		pdata->y_min = coords[1];
+		pdata->x_max = coords[2];
+		pdata->y_max = coords[3];
+	} else {
+		FTS_ERROR("unsupported property %s", name);
+		return -EINVAL;
+	}
+
+	FTS_INFO("display x(%d %d) y(%d %d)", pdata->x_min, pdata->x_max, pdata->y_min, pdata->y_max);
+	return 0;
+}
+
+/*****************************************************************************
+*  Name: fts_parse_dt
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
+{
+	int ret = 0;
+	struct device_node *np = dev->of_node;
+	u32 temp_val;
+
+	FTS_FUNC_ENTER();
+
+	ret = fts_get_dt_coords(dev, "focaltech,display-coords", pdata);
+	if (ret < 0)
+		FTS_ERROR("Unable to get display-coords");
+
+	/* key */
+	pdata->have_key = of_property_read_bool(np, "focaltech,have-key");
+	if (pdata->have_key) {
+		ret = of_property_read_u32(np, "focaltech,key-number", &pdata->key_number);
+		if (ret)
+			FTS_ERROR("Key number undefined!");
+
+		ret = of_property_read_u32_array(np, "focaltech,keys", pdata->keys, pdata->key_number);
+		if (ret)
+			FTS_ERROR("Keys undefined!");
+		else if (pdata->key_number > FTS_MAX_KEYS)
+			pdata->key_number = FTS_MAX_KEYS;
+
+		ret = of_property_read_u32(np, "focaltech,key-y-coord", &pdata->key_y_coord);
+		if (ret)
+			FTS_ERROR("Key Y Coord undefined!");
+
+		ret = of_property_read_u32_array(np, "focaltech,key-x-coords", pdata->key_x_coords, pdata->key_number);
+		if (ret)
+			FTS_ERROR("Key X Coords undefined!");
+
+		FTS_INFO("VK(%d): (%d, %d, %d), [%d, %d, %d][%d]",
+			 pdata->key_number, pdata->keys[0], pdata->keys[1], pdata->keys[2], pdata->key_x_coords[0],
+			 pdata->key_x_coords[1], pdata->key_x_coords[2], pdata->key_y_coord);
+	}
+
+	/* reset, irq gpio info */
+	pdata->reset_gpio = of_get_named_gpio_flags(np, "focaltech,reset-gpio", 0, &pdata->reset_gpio_flags);
+	if (pdata->reset_gpio < 0)
+		FTS_ERROR("Unable to get reset_gpio");
+
+	pdata->irq_gpio = of_get_named_gpio_flags(np, "focaltech,irq-gpio", 0, &pdata->irq_gpio_flags);
+	if (pdata->irq_gpio < 0)
+		FTS_ERROR("Unable to get irq_gpio");
+
+	ret = of_property_read_u32(np, "focaltech,max-touch-number", &temp_val);
+	if (0 == ret) {
+		if (temp_val < 2)
+			pdata->max_touch_number = 2;
+		else if (temp_val > FTS_MAX_POINTS_SUPPORT)
+			pdata->max_touch_number = FTS_MAX_POINTS_SUPPORT;
+		else
+			pdata->max_touch_number = temp_val;
+	} else {
+		FTS_ERROR("Unable to get max-touch-number");
+		pdata->max_touch_number = FTS_MAX_POINTS_SUPPORT;
+	}
+
+	FTS_INFO("max touch number:%d, irq gpio:%d, reset gpio:%d", pdata->max_touch_number, pdata->irq_gpio,
+		 pdata->reset_gpio);
+	ret = of_property_read_u32(np, "focaltech,avdd-load", &temp_val);
+	if (ret == 0) {
+		pdata->avdd_load = temp_val;
+	} else {
+		FTS_ERROR("Unable to get avdd load");
+	}
+	ret = of_property_read_u32(np, "focaltech,open-min", &pdata->open_min);
+	if (ret)
+		FTS_ERROR("selftest open min undefined!");
+
+	pdata->reset_when_resume = of_property_read_bool(np, "focaltech,reset-when-resume");
+
+	ret = of_property_read_u32(np, "focaltech,lockdown-info-addr",
+				   &temp_val);
+	if (ret == 0)
+		pdata->lockdown_info_addr = temp_val;
+	else
+		FTS_ERROR("Unable to get lockdown-info-addr");
+
+	FTS_FUNC_EXIT();
+	return 0;
+}
+
+static ssize_t fts_lockdown_info_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+
+	if (!ts_data)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+			(int)ts_data->lockdown_info[0], (int)ts_data->lockdown_info[1],
+			(int)ts_data->lockdown_info[2], (int)ts_data->lockdown_info[3],
+			(int)ts_data->lockdown_info[4], (int)ts_data->lockdown_info[5], (int)ts_data->lockdown_info[6],
+			(int)ts_data->lockdown_info[7]);
+}
+
+static ssize_t fts_panel_color_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+
+	if (!ts_data)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%c\n", ts_data->lockdown_info[2]);
+}
+
+static ssize_t fts_panel_vendor_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+
+	if (!ts_data)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%c\n", ts_data->lockdown_info[0]);
+}
+
+static ssize_t fts_panel_display_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+
+	if (!ts_data)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%c\n", ts_data->lockdown_info[1]);
+}
+
+static DEVICE_ATTR(panel_vendor, 0644, fts_panel_vendor_show, NULL);
+static DEVICE_ATTR(panel_color, 0644, fts_panel_color_show, NULL);
+static DEVICE_ATTR(panel_display, 0644, fts_panel_display_show, NULL);
+static DEVICE_ATTR(lockdown_info, 0644, fts_lockdown_info_show, NULL);
+
+static struct attribute *fts_attrs[] = {
+	&dev_attr_lockdown_info.attr,
+	&dev_attr_panel_color.attr,
+	&dev_attr_panel_vendor.attr,
+	&dev_attr_panel_display.attr,
+	NULL
+};
+
+static const struct attribute_group fts_attr_group = {
+	.attrs = fts_attrs
+};
+
+static void fts_power_supply_work(struct work_struct *work)
+{
+	struct fts_ts_data *ts_data = container_of(work, struct fts_ts_data, power_supply_work);
+	int is_usb_exist;
+
+	is_usb_exist = !!power_supply_is_system_supplied();
+	if (is_usb_exist != ts_data->is_usb_exist || ts_data->is_usb_exist < 0) {
+		ts_data->is_usb_exist = is_usb_exist;
+		FTS_INFO("%s %d\n", __func__, is_usb_exist);
+		if (is_usb_exist) {
+			FTS_INFO("%s USB is exist\n", __func__);
+			fts_charger_mode_set(ts_data->client, true);
+		} else {
+			FTS_INFO("%s USB is not exist\n", __func__);
+			fts_charger_mode_set(ts_data->client, false);
+		}
+	}
+}
+
+static int fts_power_supply_event(struct notifier_block *nb, unsigned long event, void *ptr)
+{
+	struct fts_ts_data *ts_data = container_of(nb, struct fts_ts_data, power_supply_notifier);
+
+	if (!ts_data)
+		return 0;
+	queue_work(ts_data->event_wq, &ts_data->power_supply_work);
+	return 0;
+}
+
+static int fts_bl_state_chg_callback(struct notifier_block *nb,
+				      unsigned long val, void *data)
+{
+	struct fts_ts_data *ts_data = container_of(nb, struct fts_ts_data, bl_notif);
+	unsigned int blank;
+
+	if (val != BACKLIGHT_UPDATED)
+		return NOTIFY_OK;
+	if (data && ts_data) {
+		blank = *(int *)(data);
+		FTS_INFO("%s: val:%lu,blank:%u\n", __func__, val, blank);
+		if (!ts_data->suspended && blank == BACKLIGHT_OFF) {
+			fts_irq_disable_sync();
+		} else {
+			fts_irq_enable();
+		}
+	}
+	return NOTIFY_OK;
+}
+
+
+#if defined(CONFIG_DRM)
+/*****************************************************************************
+*  Name: fb_notifier_callback
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
+{
+	struct msm_drm_notifier *evdata = data;
+	int *blank;
+	struct fts_ts_data *fts_data = container_of(self, struct fts_ts_data, fb_notif);
+
+	FTS_FUNC_ENTER();
+
+	if (evdata && evdata->data && event == MSM_DRM_EVENT_BLANK && fts_data && fts_data->client) {
+		blank = evdata->data;
+
+		flush_workqueue(fts_data->event_wq);
+
+		if (*blank == MSM_DRM_BLANK_UNBLANK) {
+			FTS_INFO("FTS do resume work\n");
+			fts_data->aod_status = 0;
+			queue_work(fts_data->event_wq, &fts_data->resume_work);
+		} else if (*blank == MSM_DRM_BLANK_POWERDOWN || *blank == MSM_DRM_BLANK_LP1 || *blank == MSM_DRM_BLANK_LP2) {
+			FTS_INFO("FTS do suspend work by event %s\n", *blank == MSM_DRM_BLANK_POWERDOWN ? "POWER DOWN" : "LP");
+			if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+				if (fts_data->finger_in_fod) {
+					FTS_INFO("set fod finger skip\n");
+					fts_data->fod_finger_skip = true;
+				}
+			} else {
+				fts_data->aod_status = 1;
+			}
+
+			queue_work(fts_data->event_wq, &fts_data->suspend_work);
+		}
+	}
+
+	return 0;
+}
+#endif
+
+static int check_is_focal_touch(struct fts_ts_data *ts_data)
+{
+	int ret = false;
+	u8 cmd[4] = { 0 };
+	u32 cmd_len = 0;
+	u8 val[2] = { 0 };
+
+	fts_reset_proc(10);
+	cmd[0] = FTS_CMD_START1;
+	cmd[1] = FTS_CMD_START2;
+	ret = fts_i2c_write(ts_data->client, cmd, 2);
+
+	if (ret < 0) {
+		FTS_ERROR("write 55 aa cmd fail");
+		return false;
+	}
+
+	msleep(FTS_CMD_START_DELAY);
+	cmd[0] = FTS_CMD_READ_ID;
+	cmd[1] = cmd[2] = cmd[3] = 0x00;
+
+	cmd_len = FTS_CMD_READ_ID_LEN_INCELL;
+
+	ret = fts_i2c_read(ts_data->client, cmd, cmd_len, val, 2);
+	if (ret < 0) {
+		FTS_ERROR("write 90 cmd fail");
+		return false;
+	}
+
+	FTS_INFO("read boot id:0x%02x%02x", val[0], val[1]);
+
+	return true;
+}
+
+static ssize_t fp_state_show(struct kobject *kobj, struct kobj_attribute *attr,
+			     char *buf)
+{
+	if (!fts_data)
+		return -EINVAL;
+
+	return sprintf(buf, "%d,%d,%d\n", fts_data->fod_x, fts_data->fod_y,
+		       fts_data->finger_in_fod);
+}
+
+static struct tp_common_ops fp_state_ops = {
+	.show = fp_state_show,
+};
+
+/*****************************************************************************
+*  Name: fts_ts_probe
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
+{
+	int ret = 0;
+	struct fts_ts_platform_data *pdata;
+	struct fts_ts_data *ts_data;
+
+	FTS_FUNC_ENTER();
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+		FTS_ERROR("I2C not supported");
+		return -ENODEV;
+	}
+
+	if (client->dev.of_node) {
+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+		if (!pdata) {
+			FTS_ERROR("Failed to allocate memory for platform data");
+			return -ENOMEM;
+		}
+		ret = fts_parse_dt(&client->dev, pdata);
+		if (ret)
+			FTS_ERROR("[DTS]DT parsing failed");
+	} else {
+		pdata = client->dev.platform_data;
+	}
+
+	if (!pdata) {
+		FTS_ERROR("no ts platform data found");
+		return -EINVAL;
+	}
+
+	ts_data = devm_kzalloc(&client->dev, sizeof(*ts_data), GFP_KERNEL);
+	if (!ts_data) {
+		FTS_ERROR("Failed to allocate memory for fts_data");
+		return -ENOMEM;
+	}
+
+	fts_data = ts_data;
+	ts_data->client = client;
+	ts_data->pdata = pdata;
+	i2c_set_clientdata(client, ts_data);
+
+	ts_data->ts_workqueue = create_singlethread_workqueue("fts_wq");
+	if (NULL == ts_data->ts_workqueue) {
+		FTS_ERROR("failed to create fts workqueue");
+	}
+
+	spin_lock_init(&ts_data->irq_lock);
+	mutex_init(&ts_data->report_mutex);
+
+	ret = fts_input_init(ts_data);
+	if (ret) {
+		FTS_ERROR("fts input initialize fail");
+		goto err_input_init;
+	}
+	ret = fts_power_source_init(ts_data);
+	if (ret) {
+		FTS_ERROR("fail to get vdd/vcc_i2c regulator");
+		goto err_power_init;
+	}
+
+	ts_data->power_disabled = true;
+	ret = fts_power_source_ctrl(ts_data, ENABLE);
+	if (ret) {
+		FTS_ERROR("fail to enable vdd/vcc_i2c regulator");
+		goto err_power_ctrl;
+	}
+	ret = fts_pinctrl_init(ts_data);
+	if (0 == ret) {
+		fts_pinctrl_select_normal(ts_data);
+	}
+
+	ret = fts_gpio_configure(ts_data);
+	if (ret) {
+		FTS_ERROR("[GPIO]Failed to configure the gpios");
+		goto err_gpio_config;
+	}
+#if (!FTS_CHIP_IDC)
+	fts_reset_proc(200);
+#endif
+
+	ret = fts_get_ic_information(ts_data);
+	if (ret) {
+		FTS_ERROR("can't get ic information");
+		ret = check_is_focal_touch(ts_data);
+		if (ret)
+			ts_data->fw_forceupdate = true;
+		else {
+			FTS_ERROR("No focal touch found");
+			ret = -ENODEV;
+			goto err_irq_req;
+		}
+	}
+
+	ret = sysfs_create_group(&client->dev.kobj, &fts_attr_group);
+	if (ret) {
+		FTS_ERROR("fail to export sysfs entires\n");
+		goto err_irq_req;
+	}
+
+	ret = fts_create_sysfs(client);
+	if (ret) {
+		FTS_ERROR("create sysfs node fail");
+		goto err_sysfs_create_group;
+	}
+
+	ret = fts_ex_mode_init(client);
+	if (ret) {
+		FTS_ERROR("init glove/cover/charger fail");
+		goto err_sysfs_create_group;
+	}
+
+	ret = fts_fod_gesture_init(ts_data);
+	if (ret) {
+		FTS_ERROR("init gesture fail");
+		goto err_sysfs_create_group;
+	}
+
+	ts_data->event_wq =
+	    alloc_workqueue("fts-event-queue",
+			    WQ_UNBOUND | WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
+	if (!ts_data->event_wq) {
+		FTS_ERROR("Cannot create work thread\n");
+		goto err_sysfs_create_group;
+	}
+
+	INIT_WORK(&ts_data->resume_work, fts_resume_work);
+	INIT_WORK(&ts_data->suspend_work, fts_suspend_work);
+	INIT_WORK(&ts_data->power_supply_work, fts_power_supply_work);
+	ts_data->is_usb_exist = -1;
+
+	ret = fts_irq_registration(ts_data);
+	if (ret) {
+		FTS_ERROR("request irq failed");
+		goto err_event_wq;
+	}
+	device_init_wakeup(&client->dev, 1);
+#ifdef CONFIG_PM
+	ts_data->dev_pm_suspend = false;
+	init_completion(&ts_data->pm_completion);
+#endif
+
+#if  defined(CONFIG_DRM)
+	ts_data->fb_notif.notifier_call = fb_notifier_callback;
+	ret = msm_drm_register_client(&ts_data->fb_notif);
+	if (ret) {
+		FTS_ERROR("[FB]Unable to register fb_notifier: %d", ret);
+	}
+#endif
+	ts_data->bl_notif.notifier_call = fts_bl_state_chg_callback;
+	if (backlight_register_notifier(&ts_data->bl_notif) < 0) {
+		FTS_ERROR("register bl_notifier failed!\n");
+	}
+	ts_data->power_supply_notifier.notifier_call = fts_power_supply_event;
+	power_supply_reg_notifier(&ts_data->power_supply_notifier);
+
+	ret = tp_common_set_fp_state_ops(&fp_state_ops);
+	if (ret < 0) {
+		FTS_ERROR("%s: Failed to create fp_state node err=%d\n",
+                          __func__, ret);
+	}
+
+	ret = fts_fwupg_init(ts_data);
+	if (ret) {
+		FTS_ERROR("init fw upgrade fail");
+	}
+
+	FTS_FUNC_EXIT();
+	return 0;
+err_event_wq:
+	if (ts_data->event_wq)
+		destroy_workqueue(ts_data->event_wq);
+err_sysfs_create_group:
+	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
+err_irq_req:
+	if (gpio_is_valid(pdata->reset_gpio))
+		gpio_free(pdata->reset_gpio);
+	if (gpio_is_valid(pdata->irq_gpio))
+		gpio_free(pdata->irq_gpio);
+err_gpio_config:
+	fts_pinctrl_select_release(ts_data);
+	fts_power_source_ctrl(ts_data, DISABLE);
+err_power_ctrl:
+	fts_power_source_release(ts_data);
+err_power_init:
+	kfree_safe(ts_data->point_buf);
+	kfree_safe(ts_data->events);
+	input_unregister_device(ts_data->input_dev);
+err_input_init:
+	if (ts_data->ts_workqueue)
+		destroy_workqueue(ts_data->ts_workqueue);
+	devm_kfree(&client->dev, ts_data);
+
+	FTS_FUNC_EXIT();
+	return ret;
+}
+
+/*****************************************************************************
+*  Name: fts_ts_remove
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_ts_remove(struct i2c_client *client)
+{
+	struct fts_ts_data *ts_data = i2c_get_clientdata(client);
+
+	FTS_FUNC_ENTER();
+
+	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
+
+	fts_remove_sysfs(client);
+	destroy_workqueue(ts_data->event_wq);
+	fts_ex_mode_exit(client);
+	fts_fwupg_exit(ts_data);
+
+	backlight_unregister_notifier(&ts_data->bl_notif);
+	power_supply_unreg_notifier(&ts_data->power_supply_notifier);
+#if defined(CONFIG_DRM)
+	if (msm_drm_unregister_client(&ts_data->fb_notif))
+		FTS_ERROR("Error occurred while unregistering fb_notifier.");
+#endif
+
+	free_irq(client->irq, ts_data);
+	input_unregister_device(ts_data->input_dev);
+
+	if (gpio_is_valid(ts_data->pdata->reset_gpio))
+		gpio_free(ts_data->pdata->reset_gpio);
+
+	if (gpio_is_valid(ts_data->pdata->irq_gpio))
+		gpio_free(ts_data->pdata->irq_gpio);
+
+	if (ts_data->ts_workqueue)
+		destroy_workqueue(ts_data->ts_workqueue);
+
+	fts_pinctrl_select_release(ts_data);
+	fts_power_source_ctrl(ts_data, DISABLE);
+	fts_power_source_release(ts_data);
+
+	kfree_safe(ts_data->point_buf);
+	kfree_safe(ts_data->events);
+
+	devm_kfree(&client->dev, ts_data);
+
+	FTS_FUNC_EXIT();
+	return 0;
+}
+
+
+/*****************************************************************************
+*  Name: fts_ts_suspend
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_ts_suspend(struct device *dev)
+{
+	int ret = 0;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+
+	if (ts_data->suspended) {
+		FTS_INFO("Already in suspend state");
+		return 0;
+	}
+
+	if (ts_data->fw_loading) {
+		FTS_INFO("fw upgrade in process, can't suspend");
+		return 0;
+	}
+
+	fts_irq_disable_sync();
+
+	if (fts_fod_gesture_suspend(ts_data->client) == 0) {
+		/* Enable IRQ during gesture mode */
+		fts_irq_enable();
+	} else {
+		/* Gesture mode entering failure, go to sleep mode */
+
+		fts_pinctrl_select_suspend(ts_data);
+		/* TP enter sleep mode */
+		ret = fts_i2c_write_reg(ts_data->client, FTS_REG_POWER_MODE,
+					FTS_REG_POWER_MODE_SLEEP_VALUE);
+		if (ret < 0)
+			FTS_ERROR("Failed to set sleep mode: %d", ret);
+	}
+
+	ts_data->suspended = true;
+
+	mutex_lock(&fts_data->report_mutex);
+	fts_release_all_finger();
+	mutex_unlock(&fts_data->report_mutex);
+
+	return 0;
+}
+
+/*****************************************************************************
+*  Name: fts_ts_resume
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int fts_ts_resume(struct device *dev)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+
+	if (!ts_data->suspended) {
+		FTS_DEBUG("Already in awake state");
+		return 0;
+	}
+
+	fts_pinctrl_select_normal(ts_data);
+
+	if (ts_data->pdata->reset_when_resume && !ts_data->finger_in_fod) {
+		FTS_INFO("reset when resume");
+		fts_reset_proc(200);
+
+		mutex_lock(&fts_data->report_mutex);
+		fts_release_all_finger();
+		mutex_unlock(&fts_data->report_mutex);
+	}
+
+	fts_tp_state_recovery(ts_data->client);
+
+	ts_data->suspended = false;
+
+	if (fts_fod_gesture_resume(ts_data->client) == 0)
+		return 0;
+
+	fts_irq_enable();
+
+	return 0;
+}
+
+#ifdef CONFIG_PM
+static int fts_pm_suspend(struct device *dev)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ts_data->dev_pm_suspend = true;
+	reinit_completion(&ts_data->pm_completion);
+
+	ret = enable_irq_wake(ts_data->irq);
+	if (ret)
+		FTS_INFO("enable_irq_wake(irq:%d) failed", ts_data->irq);
+
+	return ret;
+}
+
+static int fts_pm_resume(struct device *dev)
+{
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ts_data->dev_pm_suspend = false;
+	complete(&ts_data->pm_completion);
+
+	ret = disable_irq_wake(ts_data->irq);
+	if (ret)
+		FTS_INFO("disable_irq_wake(irq:%d) failed", ts_data->irq);
+
+	return 0;
+}
+
+static const struct dev_pm_ops fts_dev_pm_ops = {
+	.suspend = fts_pm_suspend,
+	.resume = fts_pm_resume,
+};
+#endif
+
+static void fts_resume_work(struct work_struct *work)
+{
+	struct fts_ts_data *ts;
+	ts = container_of(work, struct fts_ts_data, resume_work);
+	fts_ts_resume(&ts->client->dev);
+}
+
+static void fts_suspend_work(struct work_struct *work)
+{
+	struct fts_ts_data *ts;
+	ts = container_of(work, struct fts_ts_data, suspend_work);
+	fts_ts_suspend(&ts->client->dev);
+}
+
+
+/*****************************************************************************
+* I2C Driver
+*****************************************************************************/
+static const struct i2c_device_id fts_ts_id[] = {
+	{FTS_DRIVER_NAME, 0},
+	{},
+};
+
+MODULE_DEVICE_TABLE(i2c, fts_ts_id);
+
+static struct of_device_id fts_match_table[] = {
+	{.compatible = "focaltech,focal",},
+	{},
+};
+
+static struct i2c_driver fts_ts_driver = {
+	.probe = fts_ts_probe,
+	.remove = fts_ts_remove,
+	.driver = {
+		   .name = FTS_DRIVER_NAME,
+		   .owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		   .pm = &fts_dev_pm_ops,
+#endif
+		   .of_match_table = fts_match_table,
+		   },
+	.id_table = fts_ts_id,
+};
+
+/*****************************************************************************
+*  Name: fts_ts_init
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static int __init fts_ts_init(void)
+{
+	int ret = 0;
+
+	FTS_FUNC_ENTER();
+	ret = i2c_add_driver(&fts_ts_driver);
+	if (ret != 0) {
+		FTS_ERROR("Focaltech touch screen driver init failed!");
+	}
+	FTS_FUNC_EXIT();
+	return ret;
+}
+
+/*****************************************************************************
+*  Name: fts_ts_exit
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static void __exit fts_ts_exit(void)
+{
+	i2c_del_driver(&fts_ts_driver);
+}
+
+module_init(fts_ts_init);
+module_exit(fts_ts_exit);
+
+MODULE_AUTHOR("FocalTech Driver Team");
+MODULE_DESCRIPTION("FocalTech Touchscreen Driver");
+MODULE_LICENSE("GPL v2");
