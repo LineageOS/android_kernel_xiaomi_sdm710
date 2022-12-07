@@ -38,3 +38,8 @@ wcd-core-objs	+= wcd934x/wcd934x-tables.o
 
 obj-$(CONFIG_WCD9XXX_CODEC_CORE) += wcd-core.o
 obj-$(CONFIG_SND_SOC_MSM_HDMI_CODEC_RX) += msm_hdmi_codec_rx.o
+
+obj-$(CONFIG_SND_SOC_CS35L41) += cs35l41/
+obj-$(CONFIG_SPK_ID) += spk-id/
+obj-$(CONFIG_SND_SOC_TAS2557) += tas2557/
+obj-$(CONFIG_SND_SOC_TAS2562) += tas2562/

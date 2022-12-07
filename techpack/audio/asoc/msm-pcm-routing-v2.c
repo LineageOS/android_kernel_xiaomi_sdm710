@@ -31,6 +31,7 @@
 #include <sound/hwdep.h>
 #include <sound/audio_effects.h>
 #include <asoc/msm-dts-srs-tm-config.h>
+#include <dsp/msm-cirrus-playback.h>
 #include <dsp/q6voice.h>
 #include <dsp/q6adm-v2.h>
 #include <dsp/q6asm-v2.h>
@@ -38,6 +39,8 @@
 #include <dsp/q6lsm.h>
 #include <dsp/q6core.h>
 #include <dsp/audio_cal_utils.h>
+#include <dsp/apr_elliptic.h>
+#include <elliptic/elliptic_mixer_controls.h>
 
 #include "msm-pcm-routing-v2.h"
 #include "msm-pcm-routing-devdep.h"
@@ -109,6 +112,7 @@ enum {
 #define QUAT_MI2S_TX_TEXT "QUAT_MI2S_TX"
 #define ADM_LSM_TX_TEXT "ADM_LSM_TX"
 #define INT3_MI2S_TX_TEXT "INT3_MI2S_TX"
+#define INT2_MI2S_TX_TEXT "INT2_MI2S_TX"
 
 #define LSM_FUNCTION_TEXT "LSM Function"
 static const char * const lsm_port_text[] = {
@@ -116,7 +120,7 @@ static const char * const lsm_port_text[] = {
 	SLIMBUS_0_TX_TEXT, SLIMBUS_1_TX_TEXT, SLIMBUS_2_TX_TEXT,
 	SLIMBUS_3_TX_TEXT, SLIMBUS_4_TX_TEXT, SLIMBUS_5_TX_TEXT,
 	TERT_MI2S_TX_TEXT, QUAT_MI2S_TX_TEXT, ADM_LSM_TX_TEXT,
-	INT3_MI2S_TX_TEXT
+	INT3_MI2S_TX_TEXT, INT2_MI2S_TX_TEXT
 };
 
 struct msm_pcm_route_bdai_pp_params {
@@ -2517,6 +2521,9 @@ static int msm_routing_lsm_port_put(struct snd_kcontrol *kcontrol,
 	case 10:
 		lsm_port = AFE_PORT_ID_INT3_MI2S_TX;
 		break;
+	case 11:
+		lsm_port = AFE_PORT_ID_INT2_MI2S_TX;
+		break;
 	default:
 		pr_err("Default lsm port");
 		break;
@@ -2559,6 +2566,10 @@ static int msm_routing_lsm_func_get(struct snd_kcontrol *kcontrol,
 	if (strnstr(kcontrol->id.name, lsm_port_text[10],
 			strlen(lsm_port_text[10])))
 		port_id = AFE_PORT_ID_INT3_MI2S_TX;
+
+	if (strnstr(kcontrol->id.name, lsm_port_text[11],
+			strlen(lsm_port_text[11])))
+		port_id = AFE_PORT_ID_INT2_MI2S_TX;
 
 	mad_type = afe_port_get_mad_type(port_id);
 	pr_debug("%s: port_id 0x%x, mad_type %d\n", __func__, port_id,
@@ -2638,6 +2649,10 @@ static int msm_routing_lsm_func_put(struct snd_kcontrol *kcontrol,
 	if (strnstr(kcontrol->id.name, lsm_port_text[10],
 			strlen(lsm_port_text[10])))
 		port_id = AFE_PORT_ID_INT3_MI2S_TX;
+
+	if (strnstr(kcontrol->id.name, lsm_port_text[11],
+			strlen(lsm_port_text[11])))
+		port_id = AFE_PORT_ID_INT2_MI2S_TX;
 
 	pr_debug("%s: port_id 0x%x, mad_type %d\n", __func__, port_id,
 		 mad_type);
@@ -3863,6 +3878,9 @@ static int msm_routing_ext_ec_put(struct snd_kcontrol *kcontrol,
 	case EXT_EC_REF_SLIM_1_TX:
 		ext_ec_ref_port_id = SLIMBUS_1_TX;
 		break;
+	case EXT_EC_REF_PRI_MI2S_RX:
+	    ext_ec_ref_port_id = AFE_PORT_ID_PRIMARY_MI2S_RX;
+	    break;
 	case EXT_EC_REF_NONE:
 	default:
 		ext_ec_ref_port_id = AFE_PORT_INVALID;
@@ -3887,7 +3905,7 @@ static int msm_routing_ext_ec_put(struct snd_kcontrol *kcontrol,
 static const char * const ext_ec_ref_rx[] = {"NONE", "PRI_MI2S_TX",
 					"SEC_MI2S_TX", "TERT_MI2S_TX",
 					"QUAT_MI2S_TX", "QUIN_MI2S_TX",
-					"SLIM_1_TX"};
+					"SLIM_1_TX", "PRI_MI2S_RX"};
 
 static const struct soc_enum msm_route_ext_ec_ref_rx_enum[] = {
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(ext_ec_ref_rx), ext_ec_ref_rx),
@@ -4682,6 +4700,10 @@ static const struct snd_kcontrol_new tertiary_mi2s_rx_mixer_controls[] = {
 	SOC_DOUBLE_EXT("MultiMedia5", SND_SOC_NOPM,
 	MSM_BACKEND_DAI_TERTIARY_MI2S_RX,
 	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
+	msm_routing_put_audio_mixer),
+	SOC_DOUBLE_EXT("MultiMedia6", SND_SOC_NOPM,
+	MSM_BACKEND_DAI_TERTIARY_MI2S_RX,
+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
 	SOC_DOUBLE_EXT("MultiMedia7", SND_SOC_NOPM,
 	MSM_BACKEND_DAI_TERTIARY_MI2S_RX,
@@ -8740,6 +8762,10 @@ static const struct snd_kcontrol_new mmul6_mixer_controls[] = {
 	msm_routing_put_audio_mixer),
 	SOC_DOUBLE_EXT("SLIM_0_TX", SND_SOC_NOPM,
 	MSM_BACKEND_DAI_SLIMBUS_0_TX,
+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
+	msm_routing_put_audio_mixer),
+	SOC_DOUBLE_EXT("SLIM_7_TX", SND_SOC_NOPM,
+	MSM_BACKEND_DAI_SLIMBUS_7_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
 	SOC_DOUBLE_EXT("PRI_MI2S_TX", SND_SOC_NOPM,
@@ -13450,6 +13476,10 @@ static const struct snd_kcontrol_new lsm1_mixer_controls[] = {
 		MSM_BACKEND_DAI_INT3_MI2S_TX,
 		MSM_FRONTEND_DAI_LSM1, 1, 0, msm_routing_get_listen_mixer,
 		msm_routing_put_listen_mixer),
+	SOC_DOUBLE_EXT("INT2_MI2S_TX", SND_SOC_NOPM,
+		MSM_BACKEND_DAI_INT2_MI2S_TX,
+		MSM_FRONTEND_DAI_LSM1, 1, 0, msm_routing_get_listen_mixer,
+		msm_routing_put_listen_mixer),
 };
 
 static const struct snd_kcontrol_new lsm2_mixer_controls[] = {
@@ -13821,6 +13851,8 @@ static const struct snd_kcontrol_new lsm_controls[] = {
 	SOC_ENUM_EXT(QUAT_MI2S_TX_TEXT" "LSM_FUNCTION_TEXT, lsm_func_enum,
 		    msm_routing_lsm_func_get, msm_routing_lsm_func_put),
 	SOC_ENUM_EXT(INT3_MI2S_TX_TEXT" "LSM_FUNCTION_TEXT, lsm_func_enum,
+		    msm_routing_lsm_func_get, msm_routing_lsm_func_put),
+	SOC_ENUM_EXT(INT2_MI2S_TX_TEXT" "LSM_FUNCTION_TEXT, lsm_func_enum,
 		    msm_routing_lsm_func_get, msm_routing_lsm_func_put),
 	/* kcontrol of lsm_port */
 	SOC_ENUM_EXT("LSM1 Port", lsm_port_enum,
@@ -16408,6 +16440,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"TERT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
 	{"TERT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
 	{"TERT_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
 	{"TERT_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
 	{"TERT_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
 	{"TERT_MI2S_RX Audio Mixer", "MultiMedia10", "MM_DL10"},
@@ -17054,6 +17087,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MultiMedia10 Mixer", "INT2_MI2S_TX", "INT2_MI2S_TX"},
 	{"MultiMedia16 Mixer", "INT2_MI2S_TX", "INT2_MI2S_TX"},
 	{"MultiMedia6 Mixer", "INT3_MI2S_TX", "INT3_MI2S_TX"},
+	{"MultiMedia6 Mixer", "SLIM_7_TX", "SLIMBUS_7_TX"},
 	{"MultiMedia3 Mixer", "INT3_MI2S_TX", "INT3_MI2S_TX"},
 	{"MultiMedia5 Mixer", "INT3_MI2S_TX", "INT3_MI2S_TX"},
 	{"MultiMedia10 Mixer", "INT3_MI2S_TX", "INT3_MI2S_TX"},
@@ -17685,6 +17719,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"VOC_EXT_EC MUX", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
 	{"VOC_EXT_EC MUX", "QUIN_MI2S_TX", "QUIN_MI2S_TX"},
 	{"VOC_EXT_EC MUX", "SLIM_1_TX",    "SLIMBUS_1_TX"},
+	{"VOC_EXT_EC MUX", "PRI_MI2S_RX", "PRI_MI2S_RX"},
 	{"VOIP_UL", NULL, "VOC_EXT_EC MUX"},
 	{"VOICEMMODE1_UL", NULL, "VOC_EXT_EC MUX"},
 	{"VOICEMMODE2_UL", NULL, "VOC_EXT_EC MUX"},
@@ -17886,6 +17921,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"LSM1 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
 	{"LSM1 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
 	{"LSM1 Mixer", "INT3_MI2S_TX", "INT3_MI2S_TX"},
+	{"LSM1 Mixer", "INT2_MI2S_TX", "INT2_MI2S_TX"},
 	{"LSM1_UL_HL", NULL, "LSM1 Mixer"},
 
 	{"LSM2 Mixer", "SLIMBUS_0_TX", "SLIMBUS_0_TX"},
@@ -17997,11 +18033,13 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"PCM_RX", NULL, "PCM_RX_DL_HL"},
 
 	/* connect to INT4_MI2S_DL_HL since same pcm_id */
+	{"INT0_MI2S_RX_DL_HL", "Switch", "INT0_MI2S_DL_HL"},
 	{"INT0_MI2S_RX_DL_HL", "Switch", "INT4_MI2S_DL_HL"},
 	{"INT0_MI2S_RX", NULL, "INT0_MI2S_RX_DL_HL"},
 	{"INT4_MI2S_RX_DL_HL", "Switch", "INT4_MI2S_DL_HL"},
 	{"INT4_MI2S_RX", NULL, "INT4_MI2S_RX_DL_HL"},
 	{"PRI_MI2S_RX_DL_HL", "Switch", "PRI_MI2S_DL_HL"},
+	{"PRI_MI2S_RX_DL_HL", "Switch", "INT4_MI2S_DL_HL"},
 	{"PRI_MI2S_RX", NULL, "PRI_MI2S_RX_DL_HL"},
 	{"SEC_MI2S_RX_DL_HL", "Switch", "SEC_MI2S_DL_HL"},
 	{"SEC_MI2S_RX", NULL, "SEC_MI2S_RX_DL_HL"},
@@ -19553,6 +19591,8 @@ static int msm_routing_probe(struct snd_soc_platform *platform)
 		msm_routing_be_dai_name_table_mixer_controls,
 		ARRAY_SIZE(msm_routing_be_dai_name_table_mixer_controls));
 
+	msm_crus_pb_add_controls(platform);
+
 	snd_soc_add_platform_controls(platform, msm_source_tracking_controls,
 				ARRAY_SIZE(msm_source_tracking_controls));
 	snd_soc_add_platform_controls(platform, adm_channel_config_controls,
@@ -19562,6 +19602,9 @@ static int msm_routing_probe(struct snd_soc_platform *platform)
 					ARRAY_SIZE(aptx_dec_license_controls));
 	snd_soc_add_platform_controls(platform, stereo_channel_reverse_control,
 				ARRAY_SIZE(stereo_channel_reverse_control));
+
+	elliptic_add_platform_controls(platform);
+
 	return 0;
 }
 

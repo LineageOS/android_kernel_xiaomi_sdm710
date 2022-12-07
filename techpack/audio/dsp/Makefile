@@ -11,3 +11,6 @@ ifeq ($(CONFIG_ARCH_SDM845), y)
 obj-$(CONFIG_MSM_AVTIMER) += avtimer.o
 endif
 obj-$(CONFIG_MSM_QDSP6V2_CODECS)  += codecs/
+
+obj-$(CONFIG_ELLIPTIC_US) += elliptic/ apr_elliptic.o
+obj-$(CONFIG_MSM_CSPL) += msm-cirrus-playback.o
