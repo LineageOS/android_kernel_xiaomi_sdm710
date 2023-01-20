@@ -13,6 +13,8 @@
 #include "pyxis-cosmos-sdm710-common.dtsi"
 
 &firmware {
+	device = "vela";
+
 	android {
 		compatible = "android,firmware";
 		vbmeta {
