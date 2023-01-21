@@ -428,7 +428,7 @@
 };
 
 &pm660_haptics {
-	qcom,actuator-type = <1>;
+	qcom,actuator-type = "erm";
 	status = "okay";
 };
 &pm660_adc_tm {
