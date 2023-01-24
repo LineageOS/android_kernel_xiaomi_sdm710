@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4e133df2_4a02fdf4",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2023-01-24T13:54:58Z",
+      "side": 1,
+      "message": "Please don\u0027t unify devices for no real reason",
+      "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
