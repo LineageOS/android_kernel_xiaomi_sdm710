@@ -52,6 +52,23 @@
       "parentUuid": "96e6adb3_b9be3da8",
       "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4b8e857d_3036b83a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32245
+      },
+      "writtenOn": "2023-01-24T14:18:54Z",
+      "side": 1,
+      "message": "May we continue unifying pyxis\u0026vela, basing on the above conditions, or shall we drop it?",
+      "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
