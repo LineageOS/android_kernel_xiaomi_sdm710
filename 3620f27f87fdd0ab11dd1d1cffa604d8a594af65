@@ -34,6 +34,24 @@
       "parentUuid": "4e133df2_4a02fdf4",
       "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e9cc41d3_a9f2bb21",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32245
+      },
+      "writtenOn": "2023-01-24T14:10:23Z",
+      "side": 1,
+      "message": "Most of the changes I\u0027m doing for vela is just for displaying a correct device name on vela (Bluetooth/Hotspot/USB/About phone), There is barely device specific changes",
+      "parentUuid": "96e6adb3_b9be3da8",
+      "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
