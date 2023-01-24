@@ -16,6 +16,24 @@
       "message": "Please don\u0027t unify devices for no real reason",
       "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "96e6adb3_b9be3da8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32245
+      },
+      "writtenOn": "2023-01-24T14:04:56Z",
+      "side": 1,
+      "message": "1. Device `vela` is just a copy of pyxis, but with some camera mods provided by Meitu. This device is called \"Mi CC9 Meitu Edition\". vela reuses 99% of stuff from pyxis without changing.\n\n2. I met pyxis maintainer and we\u0027ve been working on it internally, planned to push it as separated target on LOS20 and fully switch to it on LOS21\n\n3. Many users have been using pyxis builds on vela as daily driver already before this",
+      "parentUuid": "4e133df2_4a02fdf4",
+      "revId": "3620f27f87fdd0ab11dd1d1cffa604d8a594af65",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
