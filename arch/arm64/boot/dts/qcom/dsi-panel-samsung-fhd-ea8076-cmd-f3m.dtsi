@@ -60,6 +60,8 @@
 		qcom,mdss-dsi-on-command-tuning;
 		qcom,dispparam-enabled;
 		qcom,mdss-panel-on-dimming-delay = <200>;
+		qcom,mdss-dsi-panel-dc-threshold = <610>;
+
 		/* IRQF_ONESHOT | IRQF_TRIGGER_FALLING */
 		/* trig-flags: falling-0x0002 rasing-0x0001 */
 		qcom,esd-err-irq-gpio = <&tlmm 78 0x2002>;
@@ -70,9 +72,6 @@
 
 		qcom,elvss_dimming_check_enable;
 		qcom,mdss-dsi-panel-elvss-dimming-read-length = <1>;
-
-		qcom,disp-fod-crc-p3-gamut-calibration;
-
 		qcom,mdss-dsi-dispparam-elvss-dimming-offset-command = [39 01 00 00 00 00 02 B0 07];
 		qcom,mdss-dsi-dispparam-elvss-dimming-offset-command-state = "dsi_hs_mode";
 		qcom,mdss-dsi-dispparam-elvss-dimming-read-command = [06 01 00 01 00 00 01 B7];
