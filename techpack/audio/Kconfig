@@ -15,9 +15,6 @@ config DTS_EAGLE
 config DTS_SRS_TM
 	tristate "DTS_SRS_TM"
 
-config ELLIPTIC_US
-	tristate "ELLIPTIC_US"
-
 config MSM_ADSP_LOADER
 	tristate "MSM_ADSP_LOADER"
 
@@ -26,9 +23,6 @@ config MSM_AVTIMER
 
 config MSM_CDC_PINCTRL
 	tristate "MSM_CDC_PINCTRL"
-
-config MSM_CSPL
-	tristate "MSM_CSPL"
 
 config MSM_GLINK_SPI_XPRT
 	tristate "MSM_GLINK_SPI_XPRT"
@@ -69,9 +63,6 @@ config SND_HWDEP_ROUTING
 config SND_SOC_ANALOG_CDC
 	tristate "SND_SOC_ANALOG_CDC"
 
-config SND_SOC_CS35L41
-	tristate "SND_SOC_CS35L41"
-
 config SND_SOC_DIGITAL_CDC
 	tristate "SND_SOC_DIGITAL_CDC"
 
@@ -110,12 +101,6 @@ config SND_SOC_SDM670
 
 config SND_SOC_SDM845
 	tristate "SND_SOC_SDM845"
-
-config SND_SOC_TAS2557
-	tristate "SND_SOC_TAS2557"
-
-config SND_SOC_TAS2562
-	tristate "SND_SOC_TAS2562"
 
 config SND_SOC_WCD9335
 	tristate "SND_SOC_WCD9335"
@@ -158,24 +143,6 @@ config SOUNDWIRE
 
 config SOUNDWIRE_WCD_CTRL
 	tristate "SOUNDWIRE_WCD_CTRL"
-
-config SPK_ID
-	tristate "SPK_ID"
-
-config TAS2557_CODEC
-	tristate "TAS2557_CODEC"
-
-config TAS2557_MISC
-	tristate "TAS2557_MISC"
-
-config TAS2557_REGMAP
-	tristate "TAS2557_REGMAP"
-
-config TAS2562_CODEC
-	tristate "TAS2562_CODEC"
-
-config TAS2562_REGMAP
-	tristate "TAS2562_REGMAP"
 
 config WCD9XXX_CODEC_CORE
 	tristate "WCD9XXX_CODEC_CORE"
