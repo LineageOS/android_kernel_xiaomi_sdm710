@@ -42,5 +42,4 @@ obj-$(CONFIG_DOLBY_DS2) += msm-ds2-dap-config.o
 obj-$(CONFIG_DOLBY_LICENSE) += msm-ds2-dap-config.o
 obj-$(CONFIG_DTS_SRS_TM) += msm-dts-srs-tm-config.o
 obj-$(CONFIG_QTI_PP) += msm-qti-pp-config.o
-
 obj-y += codecs/
