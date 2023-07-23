@@ -16,6 +16,23 @@
       "message": "tested on vela (except incall audio)",
       "revId": "6a733d92c653a60ad92d0d3bd7a1a9b0caaeaf2b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b14f451c_27e3c37c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2023-07-23T18:42:53Z",
+      "side": 1,
+      "message": "Verified on Pyxis",
+      "revId": "6a733d92c653a60ad92d0d3bd7a1a9b0caaeaf2b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
