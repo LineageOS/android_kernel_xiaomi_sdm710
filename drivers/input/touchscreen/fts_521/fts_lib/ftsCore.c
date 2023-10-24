@@ -81,7 +81,7 @@ void setResetGpio(int gpio)
 * If the reset pin is associated to a gpio, the function execute an hw reset (toggling of reset pin) otherwise send an hw command to the IC
 * @return OK if success or an error code which specify the type of error encountered
 */
-int fts_system_reset()
+int fts_system_reset(void)
 {
 	u8 readData[FIFO_EVENT_SIZE];
 	int event_to_search;
@@ -137,7 +137,7 @@ int fts_system_reset()
 * Return the value of system_resetted_down.
 * @return the flag value: 0 if not set, 1 if set
 */
-int isSystemResettedDown()
+int isSystemResettedDown(void)
 {
 	return system_reseted_down;
 }
@@ -146,7 +146,7 @@ int isSystemResettedDown()
 * Return the value of system_resetted_up.
 * @return the flag value: 0 if not set, 1 if set
 */
-int isSystemResettedUp()
+int isSystemResettedUp(void)
 {
 	return system_reseted_up;
 }
@@ -748,7 +748,7 @@ int readConfig(u16 offset, u8 * outBuf, int len)
  * Disable the interrupt so the ISR of the driver can not be called
  * @return OK if success or an error code which specify the type of error encountered
  */
-int fts_disableInterrupt()
+int fts_disableInterrupt(void)
 {
 	if (getClient() != NULL) {
 		logError(0, "%s Number of disable = %d \n", tag,
@@ -772,7 +772,7 @@ int fts_disableInterrupt()
  * Disable the interrupt async so the ISR of the driver can not be called
  * @return OK if success or an error code which specify the type of error encountered
  */
-int fts_disableInterruptNoSync()
+int fts_disableInterruptNoSync(void)
 {
 	if (getClient() != NULL) {
 		spin_lock_irq(&fts_int);
@@ -798,7 +798,7 @@ int fts_disableInterruptNoSync()
  * Reset the disable_irq count
  * @return OK
  */
-int fts_resetDisableIrqCount()
+int fts_resetDisableIrqCount(void)
 {
 	disable_irq_count = 0;
 	return OK;
@@ -808,7 +808,7 @@ int fts_resetDisableIrqCount()
  * Enable the interrupt so the ISR of the driver can be called
  * @return OK if success or an error code which specify the type of error encountered
  */
-int fts_enableInterrupt()
+int fts_enableInterrupt(void)
 {
 	if (getClient() != NULL) {
 
@@ -832,7 +832,7 @@ int fts_enableInterrupt()
 *	Check if there is a crc error in the IC which prevent the fw to run.
 *	@return  OK if no CRC error, or a number >OK according the CRC error found
 */
-int fts_crc_check()
+int fts_crc_check(void)
 {
 	u8 val;
 	u8 crc_status;
