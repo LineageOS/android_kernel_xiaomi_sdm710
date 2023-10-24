@@ -346,7 +346,7 @@ int wait_for_flash_ready(u8 type)
  * Put the M3 in hold
  * @return OK if success or an error code which specify the type of error encountered
  */
-int hold_m3()
+int hold_m3(void)
 {
 	int ret;
 	u8 cmd[1] = { 0x01 };
@@ -585,7 +585,7 @@ END:
 * Unlock the flash to be programmed
 * @return OK if success or an error code which specify the type of error encountered
 */
-int flash_unlock()
+int flash_unlock(void)
 {
 
 	u8 cmd[6] = { FTS_CMD_HW_REG_W, 0x20, 0x00, 0x00, FLASH_UNLOCK_CODE0,
@@ -608,7 +608,7 @@ int flash_unlock()
 * Unlock the flash to be erased
 * @return OK if success or an error code which specify the type of error encountered
 */
-int flash_erase_unlock()
+int flash_erase_unlock(void)
 {
 
 	u8 cmd[6] =
@@ -635,7 +635,7 @@ int flash_erase_unlock()
 * Erase the full flash
 * @return OK if success or an error code which specify the type of error encountered
 */
-int flash_full_erase()
+int flash_full_erase(void)
 {
 	int status;
 
@@ -749,7 +749,7 @@ int flash_erase_page_by_page(ErasePage keep_cx)
 * Start the DMA procedure which actually transfer and burn the data loaded from memory into the Flash
 * @return OK if success or an error code which specify the type of error encountered
 */
-int start_flash_dma()
+int start_flash_dma(void)
 {
 	int status;
 
