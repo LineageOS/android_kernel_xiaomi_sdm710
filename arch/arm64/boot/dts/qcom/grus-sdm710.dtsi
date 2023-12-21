@@ -470,34 +470,28 @@
 
 &pm660_haptics {
 	qcom,vmax-mv = <2250>;
-	qcom,lra-allow-variable-play-rate;
+	qcom,play-rate-us = <5181>;
 	qcom,lra-resonance-sig-shape = "sine";
 	qcom,lra-auto-resonance-mode = "qwd"; // Defaults to qwd in qpnp haptics driver
 	status = "okay";
 
 	wf_0 {
 		qcom,wf-vmax-mv = <2250>;
-		qcom,wf-play-rate-us = <5181>;
 	};
 	wf_1 {
 		qcom,wf-vmax-mv = <2250>;
-		qcom,wf-play-rate-us = <5181>;
 	};
 	wf_2 {
 		qcom,wf-vmax-mv = <2250>;
-		qcom,wf-play-rate-us = <5181>;
 	};
 	wf_3 {
 		qcom,wf-vmax-mv = <2250>;
-		qcom,wf-play-rate-us = <5181>;
 	};
 	wf_4 {
 		qcom,wf-vmax-mv = <2250>;
-		qcom,wf-play-rate-us = <5181>;
 	};
 	wf_5 {
 		qcom,wf-vmax-mv = <2250>;
-		qcom,wf-play-rate-us = <5181>;
 	};
 };
 
