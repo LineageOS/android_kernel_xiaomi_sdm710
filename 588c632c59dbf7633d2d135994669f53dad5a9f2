@@ -68,6 +68,24 @@
       "message": "someone else must approve",
       "revId": "588c632c59dbf7633d2d135994669f53dad5a9f2",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9bcaa6c6_0cd8725f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 33290
+      },
+      "writtenOn": "2023-12-29T09:33:37Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "8bbe7d87_c6a2b50d",
+      "revId": "588c632c59dbf7633d2d135994669f53dad5a9f2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
