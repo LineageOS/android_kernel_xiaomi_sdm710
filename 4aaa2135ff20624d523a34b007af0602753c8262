@@ -16,6 +16,24 @@
       "message": "Pick to kernel/qcom/sdm845?",
       "revId": "4aaa2135ff20624d523a34b007af0602753c8262",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0e2a5ad4_81571c6b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2024-01-20T18:08:46Z",
+      "side": 1,
+      "message": "Yes",
+      "parentUuid": "6febc8d9_4913c39e",
+      "revId": "4aaa2135ff20624d523a34b007af0602753c8262",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
