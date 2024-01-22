@@ -16,6 +16,23 @@
       "message": "Test result in: https://review.lineageos.org/c/LineageOS/android_device_xiaomi_sdm710-common/+/380692",
       "revId": "8d954b667d0612cf08d05639657e81be9f71bc9a",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6634d24d_58a9db97",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30475
+      },
+      "writtenOn": "2024-01-22T15:18:43Z",
+      "side": 1,
+      "message": "Do not merge yet.\n\nNeed to wait for https://review.lineageos.org/c/LineageOS/android_device_qcom_sepolicy_vndr/+/380665?usp\u003ddashboard",
+      "revId": "8d954b667d0612cf08d05639657e81be9f71bc9a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
