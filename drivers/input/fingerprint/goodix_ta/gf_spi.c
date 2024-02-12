@@ -488,7 +488,6 @@ static long gf_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 
 static irqreturn_t gf_irq(int irq, void *handle)
 {
-	struct gf_dev *gf_dev = &gf;
 #if defined(GF_NETLINK_ENABLE)
 	char temp[4] = { 0x0 };
 	uint32_t key_input = 0;
