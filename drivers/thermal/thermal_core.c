@@ -83,7 +83,7 @@ struct screen_monitor sm;
 
 static atomic_t switch_mode = ATOMIC_INIT(-1);
 static atomic_t temp_state = ATOMIC_INIT(0);
-static char boost_buf[128];
+static char boost_buf[PAGE_SIZE];
 
 static struct thermal_governor *__find_governor(const char *name)
 {
