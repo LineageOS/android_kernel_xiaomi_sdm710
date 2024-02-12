@@ -4980,7 +4980,6 @@ static int fts_probe(struct spi_device *client)
 	logError(1, "%s Probe Finished! \n", tag);
 	return OK;
 
-ProbeErrorExit_8:
 ProbeErrorExit_7:
 #ifdef CONFIG_DRM
 	msm_drm_unregister_client(&info->notifier);
