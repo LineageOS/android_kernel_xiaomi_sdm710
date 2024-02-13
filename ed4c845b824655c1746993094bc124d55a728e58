@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "277dd7bf_f92d5e54",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32245
+      },
+      "writtenOn": "2024-02-13T17:54:53Z",
+      "side": 1,
+      "message": "wait, thermal-engine*.conf are encoded and idk if they won\u0027t like it after renaming it back, will have to check that also",
+      "revId": "ed4c845b824655c1746993094bc124d55a728e58",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
