@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "258a32d4_fa99bd3a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 25732
+      },
+      "writtenOn": "2024-02-13T23:00:14Z",
+      "side": 1,
+      "message": "There could be something relevant to backport on newer CLO kernels, maybe qcom implemented it properly in later versions",
+      "revId": "6f2aa93ba2f017bbdc975dc6ee1e431a7582c6fa",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
