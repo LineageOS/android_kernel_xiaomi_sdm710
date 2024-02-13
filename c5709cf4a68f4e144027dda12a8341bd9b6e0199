@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fe44d780_077c2c3b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32739
+      },
+      "writtenOn": "2024-02-13T18:11:09Z",
+      "side": 1,
+      "message": "dts changes looks good to me theoretically, change can be marked verified if functionality of the sensor can be confirmed when booted on device.",
+      "revId": "c5709cf4a68f4e144027dda12a8341bd9b6e0199",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
