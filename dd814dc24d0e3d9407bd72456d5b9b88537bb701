@@ -16,6 +16,23 @@
       "message": "agree",
       "revId": "dd814dc24d0e3d9407bd72456d5b9b88537bb701",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "85938cb6_0cc99ac5",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2024-03-18T21:42:57Z",
+      "side": 1,
+      "message": "QTI USB HAL doesn\u0027t work on 4.9",
+      "revId": "dd814dc24d0e3d9407bd72456d5b9b88537bb701",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": []
