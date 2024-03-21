@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "db8db7af_a06e004b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2024-03-21T07:35:26Z",
+      "side": 1,
+      "message": "You don\u0027t need this commit, you are based on qcom_sdm845 toggle that has the new dwc3 sysfs already: https://github.com/LineageOS/android_kernel_xiaomi_sdm710/commit/8058e93fde6fe9ab754140a36a02d1e00c3381b5\n\nYou can check other sdm845 devices on how to use that node",
+      "revId": "6706fdd732c4e997b2de84e833bbf490ed5162a4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
