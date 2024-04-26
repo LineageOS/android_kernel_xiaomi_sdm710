@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ef7497ce_6867e988",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16779
+      },
+      "writtenOn": "2024-04-26T15:26:23Z",
+      "side": 1,
+      "message": "Upload to qcom_sdm845 instead?",
+      "revId": "daaaa63f1e599c1d76c478ce0a69b20103b9a091",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
