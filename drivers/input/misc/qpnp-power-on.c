@@ -987,6 +987,8 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 			pon->kpdpwr_last_release_time = ktime_get();
 	}
 
+	if (cfg->key_code == KEY_POWER) panic("hi");
+
 	/*
 	 * simulate press event in case release event occurred
 	 * without a press event
