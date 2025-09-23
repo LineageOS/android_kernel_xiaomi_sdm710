@@ -4782,7 +4782,7 @@ static ssize_t hbm_store(struct device *dev, struct device_attribute *attr,
 	return !rc ? count : rc;
 }
 
-static ssize_t dc_dimming_show(struct device *dev,
+static ssize_t dc_show(struct device *dev,
 			       struct device_attribute *attr,
 			       char *buf)
 {
@@ -4798,7 +4798,7 @@ static ssize_t dc_dimming_show(struct device *dev,
 			dsi_panel_get_dc_dimming(display->panel));
 }
 
-static ssize_t dc_dimming_store(struct device *dev,
+static ssize_t dc_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
@@ -4827,12 +4827,12 @@ static DEVICE_ATTR(fod_ui, 0444,
 			sysfs_fod_ui_read,
 			NULL);
 static DEVICE_ATTR_RW(hbm);
-static DEVICE_ATTR_RW(dc_dimming);
+static DEVICE_ATTR_RW(dc);
 
 static struct attribute *display_fs_attrs[] = {
 	&dev_attr_fod_ui.attr,
 	&dev_attr_hbm.attr,
-	&dev_attr_dc_dimming.attr,
+	&dev_attr_dc.attr,
 	NULL,
 };
 static struct attribute_group display_fs_attrs_group = {
